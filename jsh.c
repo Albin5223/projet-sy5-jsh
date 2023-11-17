@@ -30,8 +30,10 @@ int execute_commande_externe(char **commande_args){
     int recup;
 
     if(pid == 0){
-        int n = execvp(commande_args[0],commande_args);
-        return n;
+        if (execvp(commande_args[0], commande_args) == -1) {
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        }
     }
     else{
         waitpid(pid, &recup, 0);
