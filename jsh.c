@@ -36,9 +36,34 @@ int execute_commande_externe(char **commande_args){
     }
     return 0;
 }
+
+
+int execute_cd(char **commande_args,char *precedent){
+    int size = 0;
+    while(commande_args[size] != NULL){
+        size++;
+    }
+    if(size == 1 ||strcmp( commande_args[1],"$HOME")==0 ){
+        chdir("/home");
+        return 0;
+    }
+    if(size > 2){
+        printf("Erreur: cd prend un seul argument\n");
+        return -1;
+    }
+    if(strcmp(commande_args[1],"-") == 0){
+        chdir(precedent);
+        return 0;
+    }
+    
+    int n = chdir(commande_args[1]);
+    return n;
+}
+
 int main(int argc, char const *argv[]){
     
     char *input;
+    char *precedent;
     using_history();
 
     while(1){
@@ -46,16 +71,12 @@ int main(int argc, char const *argv[]){
         add_history(input);
         char **commande_args = get_tab_of_commande(input);
 
-        int i = 0;
-        while(commande_args[i] != NULL){
-            printf("%s\n",commande_args[i]);
-            i++;
-        }
         if(strcmp(commande_args[0],"exit") == 0){
             break;
         }
         if(strcmp(commande_args[0],"cd") == 0){
-            chdir(commande_args[1]);
+            int n = execute_cd(commande_args,precedent);
+            printf("----%d\n",n);
         }
         else{
             execute_commande_externe(commande_args);
@@ -64,6 +85,7 @@ int main(int argc, char const *argv[]){
 
         free(commande_args);
     }
+    
     
     return 0;
 }
