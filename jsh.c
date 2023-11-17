@@ -6,16 +6,27 @@
 #include <readline/history.h>
 #include <sys/wait.h>
 
+/**
+ * Represents the maximum size of the path
+*/
 #define MAX_PATH_SIZE 150
 
+/**
+ * Represents the different colors that can be used
+*/
 enum color {red,green,blue,yellow,cyan,white};
 
+/**
+ * @brief Add the color to the string, and put the color back to white at the end of the string
+ * @param string The string to color
+ * @param c The color to add
+*/
 void color_switch(char **string,enum color c){
 
-    char *new_string = calloc((strlen(*string)+1),sizeof(char));
+    char *new_string = calloc((strlen(*string) + 2*strlen("\033[37m") + 1), sizeof(char));  // Allocating the new string
 
-    char *color = malloc(sizeof(char)*9);
-    switch(c){
+    const char *color;  // The color to add
+    switch(c){  // Choosing the color
         case red:
             color = "\033[31m";
             break;
@@ -36,12 +47,12 @@ void color_switch(char **string,enum color c){
             break;
     }
 
-    strcat(new_string,color);
-    strcat(new_string,*string);
-    strcat(new_string,"\033[37m");
+    strcat(new_string,color);   // Adding the color
+    strcat(new_string,*string); // Adding the string
+    strcat(new_string,"\033[37m");  // Adding the white color
 
-    free(*string);
-    *string = new_string;
+    free(*string);  // Freeing the old string
+    *string = new_string;   // Changing the pointer to the new string
 }
 
 char** get_tab_of_commande  (char *commande){
@@ -76,22 +87,34 @@ int execute_commande_externe(char **commande_args){
     return 0;
 }
 
+/**
+ * @brief Execute the command 'pwd' and return the path
+*/
 char *execute_pwd(){
-    char *pwd = malloc(sizeof(char)*MAX_PATH_SIZE);
-    if(getcwd(pwd,MAX_PATH_SIZE) == NULL){
+    char *pwd = malloc(sizeof(char)*MAX_PATH_SIZE); // Allocating the path
+    if(getcwd(pwd,MAX_PATH_SIZE) == NULL){  // Getting the path
         printf("Error in 'path_shell' : couldn't execute 'getcwd'...\n");
         exit(1);
     }
-    if ((pwd = realloc(pwd, sizeof(char) * (strlen(pwd) + 1))) == NULL) {
+    if ((pwd = realloc(pwd, sizeof(char) * (strlen(pwd) + 1))) == NULL) {   // Reallocating the path to the right size
         printf("Error in 'path_shell' : couldn't realloc...\n");
         exit(1);
     }
     return pwd;
 }
 
-char *path_shell(char *signe){
-    char *pwd = execute_pwd();
-    strcat(pwd,signe);
+/**
+ * @brief Return the path with the signe (like '$' or '>'), and color the path (without the signe)
+*/
+char *path_shell(char *signe, enum color c){
+    char *pwd = execute_pwd();  // Getting the path
+    color_switch(&pwd,c);    // Adding the color to the path (and not the signe)
+    pwd = realloc(pwd, sizeof(char)*(strlen(pwd) + strlen(signe) + 1));   // Increasing the size of the path to add the signe
+    if (pwd == NULL) {
+        printf("Error in 'path_shell' : couldn't realloc...\n");
+        exit(1);
+    }
+    strcat(pwd, signe);   // Adding the signe to the path
     return pwd;
 }
 
@@ -101,8 +124,7 @@ int main(int argc, char const *argv[]){
     using_history();
 
     while(1){
-        char *path = path_shell("$ ");
-        color_switch(&path,green);
+        char *path = path_shell("$ ",blue);
         input = readline(path);
         free(path);
 
