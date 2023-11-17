@@ -54,6 +54,9 @@ int main(int argc, char const *argv[]){
         if(strcmp(commande_args[0],"exit") == 0){
             break;
         }
+        if(strcmp(commande_args[0],"cd") == 0){
+            chdir(commande_args[1]);
+        }
         else{
             execute_commande_externe(commande_args);
         }
