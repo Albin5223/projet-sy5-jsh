@@ -12,6 +12,25 @@
 #define MAX_PATH_SIZE 150
 
 /**
+ * Represents the maximum size of shell_path
+*/
+#define TRONCATURE_SHELL 30
+
+/**
+ * @brief Truncate the string to the size of TRONCATURE_SHELL
+ * @param original The string to truncate
+*/
+void truncate_string(char **original) {
+    int len = strlen(*original);
+    if (len > TRONCATURE_SHELL-3) {
+        char *new_string = malloc(TRONCATURE_SHELL+1); // 3 dots + TRONCATURE_SHELL-3 characters + null terminator
+        snprintf(new_string, 31, "...%s", *original + len - 27);
+        free(*original);
+        *original = new_string;
+    }
+}
+
+/**
  * Represents the different colors that can be used
 */
 enum color {red,green,blue,yellow,cyan,white};
@@ -108,6 +127,7 @@ char *execute_pwd(){
 */
 char *path_shell(char *signe, enum color c){
     char *pwd = execute_pwd();  // Getting the path
+    truncate_string(&pwd);  // Truncating the path
     color_switch(&pwd,c);    // Adding the color to the path (and not the signe)
     pwd = realloc(pwd, sizeof(char)*(strlen(pwd) + strlen(signe) + 1));   // Increasing the size of the path to add the signe
     if (pwd == NULL) {
