@@ -48,7 +48,8 @@ void pointInterrogation(HIST_ENTRY *last_entry){
         }
 
         strcpy(last_commande,last_entry->line);
-        printf ("%d", execute_commande_externe(get_tab_of_commande(last_commande)));
+        int recup = execute_commande_externe(get_tab_of_commande(last_commande));
+        if (recup == -1) fprintf(stderr, "Erreur d'exécution lors de la commande : %s\n",last_commande);
         free(last_commande);
     }else{
         fprintf(stderr, "Pas de commande précédente\n");
