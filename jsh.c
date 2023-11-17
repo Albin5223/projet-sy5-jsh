@@ -7,7 +7,17 @@
 
 #define MAX_PATH_SIZE 150
 
-char** get_tab_of_commande  (char *commande){
+
+char *execute_pwd(int max_size){
+    char *pwd = malloc(sizeof(char)*max_size);
+    if(getcwd(pwd,max_size) == NULL){
+        printf("Error in 'path_shell' : couldn't execute 'getcwd'...\n");
+        exit(1);
+    }
+    return pwd;
+}
+
+char** get_tab_of_commande(char *commande){
     int size = 0;
     for(int i = 0; i<strlen(commande);i++){
         if(commande[i] == ' '){
@@ -28,24 +38,61 @@ char** get_tab_of_commande  (char *commande){
 }
 
 int execute_commande_externe(char **commande_args){
+    int s=0;
     pid_t pid = fork();
     if(pid == 0){
         int n = execvp(commande_args[0],commande_args);
         return n;
     }
     else{
-        wait(NULL);
+        waitpid(pid,&s,0);
     }
+    return s;
+}
+
+int change_precedent(char **prec,char *new){
+    int size = strlen(new);
+    free(*prec);
+    *prec = malloc(sizeof(char)*(size+1));
+    strcpy(*prec,new);
+    printf("------prec : %s\n",*prec);
+    
     return 0;
 }
 
-char *execute_pwd(int max_size){
-    char *pwd = malloc(sizeof(char)*max_size);
-    if(getcwd(pwd,max_size) == NULL){
-        printf("Error in 'path_shell' : couldn't execute 'getcwd'...\n");
-        exit(1);
+int execute_cd(char **commande_args,char **precedent){
+    int size = 0;
+    char *pwd = execute_pwd(MAX_PATH_SIZE);
+
+    while(commande_args[size] != NULL){
+        size++;
     }
-    return pwd;
+    if(size == 1 ||strcmp( commande_args[1],"$HOME")==0 ){
+        chdir("/home");
+        change_precedent(precedent,pwd);
+        free(pwd);
+        return 0;
+    }
+    if(size > 2){
+        free(pwd);
+        printf("Erreur: cd prend un seul argument\n");
+        return -1;
+    }
+    if(strcmp(commande_args[1],"-") == 0){
+        chdir(*precedent);
+    }
+    else{
+        int n = chdir(commande_args[1]);
+          if(n == -1){
+            printf("Erreur: le dossier n'existe pas\n");
+            free(pwd);
+            return -1;
+        }
+    }
+    change_precedent(precedent,pwd);
+    free(pwd);
+    return 0;
+
 }
 
 char *path_shell(int max_size, char signe){
@@ -71,23 +118,27 @@ char *path_shell(int max_size, char signe){
 int main(int argc, char const *argv[]){
     
     char *input;
+    char *precedent = execute_pwd(MAX_PATH_SIZE);
+   
+    
     using_history();
 
     while(1){
+        
         char *path = path_shell(MAX_PATH_SIZE,'$');
+        
         input = readline(path);
         free(path);
 
         add_history(input);
         char **commande_args = get_tab_of_commande(input);
 
-        int i = 0;
-        while(commande_args[i] != NULL){
-            printf("%s\n",commande_args[i]);
-            i++;
-        }
         if(strcmp(commande_args[0],"exit") == 0){
             break;
+        }
+        if(strcmp(commande_args[0],"cd") == 0){
+            execute_cd(commande_args,&precedent);
+
         }
         else{
             execute_commande_externe(commande_args);
@@ -96,6 +147,8 @@ int main(int argc, char const *argv[]){
 
         free(commande_args);
     }
+    free(precedent);
+    
     
     return 0;
 }
