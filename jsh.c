@@ -30,15 +30,29 @@ int execute_commande_externe(char **commande_args){
     int recup;
 
     if(pid == 0){
-        if (execvp(commande_args[0], commande_args) == -1) {
-            perror("execvp");
-            exit(EXIT_FAILURE);
-        }
+        int exec = execvp(commande_args[0],commande_args);
+        return exec;
     }
     else{
         waitpid(pid, &recup, 0);
+        return recup;
     }
-    return recup;
+}
+
+void pointInterrogation(HIST_ENTRY *last_entry){
+    if (last_entry != NULL){
+        char * last_commande = malloc(sizeof(char)*strlen(last_entry->line));
+        if (last_commande == NULL){
+            fprintf(stderr, "Erreur d'allocation mémoire\n");
+            exit(EXIT_FAILURE);
+        }
+
+        strcpy(last_commande,last_entry->line);
+        printf ("%d", execute_commande_externe(get_tab_of_commande(last_commande)));
+        free(last_commande);
+    }else{
+        fprintf(stderr, "Pas de commande précédente\n");
+    } 
 }
 
 int main(int argc, char const *argv[]){
@@ -59,22 +73,7 @@ int main(int argc, char const *argv[]){
         if(strcmp(commande_args[0],"exit") == 0){
             break;
         }else if (strcmp(commande_args[0],"?") == 0){
-            HIST_ENTRY *last_entry;
-            int len = history_length;
-
-            if (len > 0) {
-                last_entry = history_get(len-1); 
-                if (last_entry != NULL){
-                    char * last_commande = malloc(sizeof(char)*strlen(last_entry->line));
-                    strcpy(last_commande,last_entry->line);
-                    printf ("%d", execute_commande_externe(get_tab_of_commande(last_commande)));
-                    free(last_commande);
-                }else{
-                    fprintf(stderr, "Pas de commande précédente\n");
-                } 
-            } else {
-                fprintf(stderr, "Historique vide\n");
-            }
+            pointInterrogation(history_get(history_length - 1));
         }else{
             execute_commande_externe(commande_args);
         }
