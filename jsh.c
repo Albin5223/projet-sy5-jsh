@@ -15,11 +15,6 @@
 */
 #define TRONCATURE_SHELL 30
 
-/*
- * variable globale pour le code de retour de la dernière commande
-*/
-int last_return_code = 0;
-
 /**
  * @brief Truncate the string to the size of TRONCATURE_SHELL
  * @param original The string to truncate
@@ -114,18 +109,25 @@ char** get_tab_of_commande  (char *commande){
     return commande_args;
 }
 
+/*
+ * variable globale pour le code de retour de la dernière commande
+*/
+int last_return_code = -1;
 void execute_commande_externe(char **commande_args){
     pid_t pid = fork();
 
     if(pid == 0){
         execvp(commande_args[0],commande_args);
         fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
+        last_return_code = -1;
     }
     else{
         int status;   
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
             last_return_code = WEXITSTATUS(status);
+        }else{
+            last_return_code = -1;
         }
     }
 }
@@ -213,7 +215,7 @@ int main(int argc, char const *argv[]){
             printf("%d\n",last_return_code);
         }
         else if(strcmp(commande_args[0],"cd") == 0){
-            execute_cd(commande_args,&precedent);
+            last_return_code = execute_cd(commande_args,&precedent);
         }
         else{
             execute_commande_externe(commande_args);
