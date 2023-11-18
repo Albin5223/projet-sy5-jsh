@@ -7,6 +7,7 @@
 
 #define MAX_PATH_SIZE 150
 
+int last_return_code = 0;
 
 char *execute_pwd(int max_size){
     char *pwd = malloc(sizeof(char)*max_size);
@@ -37,40 +38,19 @@ char** get_tab_of_commande(char *commande){
     return commande_args;
 }
 
-int execute_commande_externe(char **commande_args){
+void execute_commande_externe(char **commande_args){
     pid_t pid = fork();
-    int stat;
 
     if(pid == 0){
-        int exec = execvp(commande_args[0],commande_args);
-        return exec;
+        execvp(commande_args[0],commande_args);
+        fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
     }
     else{
-        waitpid(pid, &stat, 0);
-        return stat;
-    }
-}
-
-void pointInterrogation(HIST_ENTRY *last_entry, int nb){
-    if (strcmp(last_entry->line,"?") == 0){
-        if (history_length < nb){
-            fprintf(stderr, "Erreur : pas assez de commandes dans l'historique\n");
-        }else{
-            pointInterrogation(history_get(history_length - nb), nb + 1);
+        int status;   
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            last_return_code = WEXITSTATUS(status);
         }
-    }else if (last_entry != NULL){
-        char * last_commande = malloc(sizeof(char)*strlen(last_entry->line));
-        if (last_commande == NULL){
-            fprintf(stderr, "Erreur d'allocation mémoire\n");
-            exit(EXIT_FAILURE);
-        }
-
-        strcpy(last_commande,last_entry->line);
-        int recup = execute_commande_externe(get_tab_of_commande(last_commande));
-        if (recup == -1) fprintf(stderr, "Erreur d'exécution lors de la commande : %s\n",last_commande);
-        free(last_commande);
-    }else{
-        fprintf(stderr, "Erreur : pas assez de commandes dans l'historique\n");
     }
 }
 
@@ -160,7 +140,7 @@ int main(int argc, char const *argv[]){
             break;
         }
         else if (strcmp(commande_args[0],"?") == 0){
-            pointInterrogation(history_get(history_length - 1), 2);
+            printf("%d\n",last_return_code);
         }
         else if(strcmp(commande_args[0],"cd") == 0){
             execute_cd(commande_args,&precedent);
