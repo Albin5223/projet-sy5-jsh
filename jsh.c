@@ -210,7 +210,7 @@ char *path_shell(char *signe, enum color c){
 int main(int argc, char const *argv[]){
     
     char *input;
-    char *precedent = execute_pwd(MAX_PATH_SIZE);
+    char *precedent = execute_pwd();
    
     
     using_history();
