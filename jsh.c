@@ -109,25 +109,22 @@ char** get_tab_of_commande  (char *commande){
     return commande_args;
 }
 
-/*
- * variable globale pour le code de retour de la dernière commande
-*/
-int last_return_code = -1;
-void execute_commande_externe(char **commande_args){
+int execute_commande_externe(char **commande_args){
     pid_t pid = fork();
 
     if(pid == 0){
         execvp(commande_args[0],commande_args);
         fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
-        last_return_code = -1;
+        exit(EXIT_FAILURE);
     }
     else{
-        int status;   
-        waitpid(pid, &status, 0);
-        if (WIFEXITED(status)) {
-            last_return_code = WEXITSTATUS(status);
-        }else{
-            last_return_code = -1;
+        int status;
+        waitpid(pid,&status,0);
+        if(WIFEXITED(status)){
+            return WEXITSTATUS(status);
+        }
+        else{
+            return -1;
         }
     }
 }
@@ -197,6 +194,7 @@ int main(int argc, char const *argv[]){
     char *input;
     char *precedent = execute_pwd();
    
+    int last_return_code = -1;
     
     using_history();
 
@@ -218,7 +216,7 @@ int main(int argc, char const *argv[]){
             last_return_code = execute_cd(commande_args,&precedent);
         }
         else{
-            execute_commande_externe(commande_args);
+            last_return_code = execute_commande_externe(commande_args);
         }
 
         free(commande_args);
