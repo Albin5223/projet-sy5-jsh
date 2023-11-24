@@ -78,6 +78,7 @@ void color_switch(char **string,enum color c){
 */
 char *execute_pwd(){
     char *pwd = malloc(sizeof(char)*MAX_PATH_SIZE); // Allocating the path
+    if (!pwd) return NULL;      // -> adapter du coup tout le reste
     if(getcwd(pwd,MAX_PATH_SIZE) == NULL){  // Getting the path
         printf("Error in 'path_shell' : couldn't execute 'getcwd'...\n");
         exit(1);
@@ -89,20 +90,22 @@ char *execute_pwd(){
     return pwd;
 }
 
-char** get_tab_of_commande  (char *commande){
+char** get_tab_of_commande  (char* commande){
     int size = 0;
-    for(int i = 0; i<strlen(commande);i++){
-        if(commande[i] == ' '){
-            size++;
-        }
+    char *copy = strdup(commande); 
+    if (!copy) exit(EXIT_FAILURE);
+
+    for (char *x = strtok(copy, " "); x != NULL; x = strtok(NULL, " ")) {
+        size++;
     }
+    free(copy);
+
+    char **commande_args= malloc(sizeof(char*) * (size + 1));
+    if (!commande_args) exit(EXIT_FAILURE);
+
     int i = 0;
-    char **commande_args= malloc(sizeof(char*)*(size+1));
-    char *token = strtok(commande," ");
-    while(token != NULL){
-        commande_args[i] = token;
-        token = strtok(NULL," ");
-        i++;
+    for (char *token = strtok(commande, " "); token != NULL; token = strtok(NULL, " ")) {
+        commande_args[i++] = token;
     }
     commande_args[i] = NULL;
 
@@ -113,19 +116,17 @@ int execute_commande_externe(char **commande_args){
     pid_t pid = fork();
 
     if(pid == 0){
-        execvp(commande_args[0],commande_args);
+        execvp(commande_args[0], commande_args);
         fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
         exit(EXIT_FAILURE);
     }
     else{
-        int status;
-        waitpid(pid,&status,0);
-        if(WIFEXITED(status)){
-            return WEXITSTATUS(status);
+        int s;
+        waitpid(pid,&s,0);
+        if(WIFEXITED(s)){
+            return WEXITSTATUS(s);
         }
-        else{
-            return -1;
-        }
+        return 0;
     }
 }
 
@@ -154,8 +155,8 @@ int execute_cd(char **commande_args,char **precedent){
     }
     if(size > 2){
         free(pwd);
-        printf("Erreur: cd prend un seul argument\n");
-        return -1;
+        printf("Erreur: cd prend un seul %d argument\n", size);
+        return 1;
     }
     if(strcmp(commande_args[1],"-") == 0){
         chdir(*precedent);
@@ -165,7 +166,7 @@ int execute_cd(char **commande_args,char **precedent){
           if(n == -1){
             printf("Erreur: le dossier n'existe pas\n");
             free(pwd);
-            return -1;
+            return 1;
         }
     }
     change_precedent(precedent,pwd);
@@ -194,7 +195,7 @@ int main(int argc, char const *argv[]){
     char *input;
     char *precedent = execute_pwd();
    
-    int last_return_code = -1;
+    int last_return_code = 0;
     
     using_history();
 
@@ -213,7 +214,7 @@ int main(int argc, char const *argv[]){
             printf("%d\n",last_return_code);
         }
         else if(strcmp(commande_args[0],"cd") == 0){
-            last_return_code = execute_cd(commande_args,&precedent);
+            last_return_code = execute_cd(commande_args, &precedent);
         }
         else{
             last_return_code = execute_commande_externe(commande_args);
