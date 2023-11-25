@@ -245,6 +245,7 @@ int main(int argc, char const *argv[]){
         }
         
         free(commande_args);
+        free(input);
     }
     free(precedent);
     clear_history();
