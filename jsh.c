@@ -9,7 +9,9 @@
 /**
  * Represents the maximum size of the path
 */
-#define MAX_PATH_SIZE 150
+#define MAX_PATH_SIZE 2048
+
+#define NUMBER_OF_JOBS 0
 /**
  * Represents the maximum size of shell_path
 */
@@ -23,7 +25,7 @@ void truncate_string(char **original) {
     int len = strlen(*original);
     if (len > TRONCATURE_SHELL-3) {
         char *new_string = malloc(TRONCATURE_SHELL+1); // 3 dots + TRONCATURE_SHELL-3 characters + null terminator
-        snprintf(new_string, 31, "...%s", *original + len - 27);
+        snprintf(new_string, 31, "[%d]...%s",NUMBER_OF_JOBS, *original + len - 22);
         free(*original);
         *original = new_string;
     }
@@ -92,7 +94,7 @@ char *execute_pwd(){
 
 char** get_tab_of_commande  (char* commande){
     int size = 0;
-    char *copy = strdup(commande); 
+    char *copy = strdup(commande);
     if (!copy) exit(EXIT_FAILURE);
 
     for (char *x = strtok(copy, " "); x != NULL; x = strtok(NULL, " ")) {
@@ -101,7 +103,7 @@ char** get_tab_of_commande  (char* commande){
     free(copy);
 
     char **commande_args= malloc(sizeof(char*) * (size + 1));
-    if (!commande_args) exit(EXIT_FAILURE);
+    if (commande_args == NULL) exit(EXIT_FAILURE);
 
     int i = 0;
     for (char *token = strtok(commande, " "); token != NULL; token = strtok(NULL, " ")) {
@@ -135,7 +137,6 @@ int change_precedent(char **prec,char *new){
     free(*prec);
     *prec = malloc(sizeof(char)*(size+1));
     strcpy(*prec,new);
-    printf("------prec : %s\n",*prec);
     
     return 0;
 }
@@ -198,17 +199,26 @@ int main(int argc, char const *argv[]){
     int last_return_code = 0;
     
     using_history();
+    rl_outstream = stderr;
 
     while(1){
         char *path = path_shell("$ ",blue);
+        
         input = readline(path);
         free(path);
-
-        add_history(input);
+        if(strlen(input) == 0){
+            continue;
+        }
+        
         char **commande_args = get_tab_of_commande(input);
 
         if(strcmp(commande_args[0],"exit") == 0){
-            break;
+            if(commande_args[1] != NULL){
+                exit(atoi(commande_args[1]));
+            }
+            else{
+                exit(last_return_code);
+            }
         }
         else if (strcmp(commande_args[0],"?") == 0){
             printf("%d\n",last_return_code);
@@ -219,10 +229,11 @@ int main(int argc, char const *argv[]){
         else{
             last_return_code = execute_commande_externe(commande_args);
         }
-
+        add_history(input);
         free(commande_args);
     }
     free(precedent);
+    clear_history();
     
     
     return 0;
