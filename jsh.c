@@ -12,20 +12,38 @@
 #define MAX_PATH_SIZE 2048
 
 #define NUMBER_OF_JOBS 0
+
 /**
- * Represents the maximum size of shell_path
+ * Represents the maximum size of the truncated path
 */
 #define TRONCATURE_SHELL 30
 
 /**
- * @brief Truncate the string to the size of TRONCATURE_SHELL
+ * @brief Return the number of digits of the number n (including the signe)
+*/
+int number_length(int n){
+    int i = 0;
+    if(n < 0){
+        i++;
+        n = -n;
+    }
+    do {
+        n = n/10;
+        i++;
+    } while(n != 0);
+    return i;
+}
+
+/**
+ * @brief Truncate the string to the size of truncate_size
  * @param original The string to truncate
 */
-void truncate_string(char **original) {
+void truncate_string(char **original, int truncate_size) {
     int len = strlen(*original);
-    if (len > TRONCATURE_SHELL-3) {
-        char *new_string = malloc(TRONCATURE_SHELL+1); // 3 dots + TRONCATURE_SHELL-3 characters + null terminator
-        snprintf(new_string, 31, "[%d]...%s",NUMBER_OF_JOBS, *original + len - 22);
+    int len_to_truncate = number_length(NUMBER_OF_JOBS) + 2 + 3; // length of the int + 2 brackets + 3 dots
+    if (len > truncate_size-len_to_truncate) {
+        char *new_string = malloc(truncate_size+1); // 3 dots + truncate_size-3 characters + null terminator
+        snprintf(new_string, truncate_size+1, "[%d]...%s",NUMBER_OF_JOBS, (*original + len) - (truncate_size-len_to_truncate));
         free(*original);
         *original = new_string;
     }
@@ -180,7 +198,7 @@ int execute_cd(char **commande_args,char **precedent){
 */
 char *path_shell(char *signe, enum color c){
     char *pwd = execute_pwd();  // Getting the path
-    truncate_string(&pwd);  // Truncating the path
+    truncate_string(&pwd,30-strlen(signe));  // Truncating the path
     color_switch(&pwd,c);    // Adding the color to the path (and not the signe)
     pwd = realloc(pwd, sizeof(char)*(strlen(pwd) + strlen(signe) + 1));   // Increasing the size of the path to add the signe
     if (pwd == NULL) {
