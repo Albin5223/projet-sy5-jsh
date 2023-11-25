@@ -166,8 +166,14 @@ int execute_cd(char **commande_args,char **precedent){
     while(commande_args[size] != NULL){
         size++;
     }
-    if(size == 1 ||strcmp( commande_args[1],"$HOME")==0 ){
-        chdir("/home");
+    if(size == 1 || strcmp( commande_args[1],"$HOME")==0 ){
+        char *home = getenv("HOME");
+        if(home == NULL){
+            printf("Erreur: la variable d'environnement HOME n'est pas définie\n");
+            free(pwd);
+            return 1;
+        }
+        chdir(home);
         change_precedent(precedent,pwd);
         free(pwd);
         return 0;
@@ -244,6 +250,7 @@ int main(int argc, char const *argv[]){
         }
         else if (strcmp(commande_args[0],"?") == 0){
             printf("%d\n",last_return_code);
+            last_return_code = 0;
         }
         else if(strcmp(commande_args[0],"cd") == 0){
             last_return_code = execute_cd(commande_args, &precedent);
