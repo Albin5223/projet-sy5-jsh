@@ -211,11 +211,15 @@ int main(int argc, char const *argv[]){
         char *path = path_shell("$ ",blue);
         
         input = readline(path);
+        if(input == NULL){
+            exit(0);
+        }
         free(path);
         if(strlen(input) == 0){
             continue;
         }
-        
+
+        add_history(input);
         char **commande_args = get_tab_of_commande(input);
 
         if(strcmp(commande_args[0],"exit") == 0){
@@ -235,7 +239,7 @@ int main(int argc, char const *argv[]){
         else{
             last_return_code = execute_commande_externe(commande_args);
         }
-        add_history(input);
+        
         free(commande_args);
     }
     free(precedent);
