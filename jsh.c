@@ -93,22 +93,28 @@ char *execute_pwd(){
 }
 
 char** get_tab_of_commande  (char* commande){
-    int size = 0;
-    char *copy = strdup(commande);
-    if (!copy) exit(EXIT_FAILURE);
+    char *copy1 = strdup(commande);
+    if (!copy1) exit(EXIT_FAILURE);
 
-    for (char *x = strtok(copy, " "); x != NULL; x = strtok(NULL, " ")) {
+    int size = 0;
+    for (char *x = strtok(copy1, " "); x != NULL; x = strtok(NULL, " ")) {
         size++;
     }
-    free(copy);
+    free(copy1);
 
     char **commande_args= malloc(sizeof(char*) * (size + 1));
     if (commande_args == NULL) exit(EXIT_FAILURE);
 
+    char *copy2 = strdup(commande);
+    if (!copy2) exit(EXIT_FAILURE);
+
     int i = 0;
-    for (char *token = strtok(commande, " "); token != NULL; token = strtok(NULL, " ")) {
-        commande_args[i++] = token;
+    for (char *token = strtok(copy2, " "); token != NULL; token = strtok(NULL, " ")) {
+        commande_args[i] = strdup(token);
+        if (commande_args[i] == NULL) exit(EXIT_FAILURE);
+        i++;
     }
+    free(copy2);
     commande_args[i] = NULL;
 
     return commande_args;
