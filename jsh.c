@@ -105,16 +105,13 @@ char** get_tab_of_commande  (char* commande){
     char **commande_args= malloc(sizeof(char*) * (size + 1));
     if (commande_args == NULL) exit(EXIT_FAILURE);
 
-    char *copy2 = strdup(commande);
-    if (!copy2) exit(EXIT_FAILURE);
-
     int i = 0;
-    for (char *token = strtok(copy2, " "); token != NULL; token = strtok(NULL, " ")) {
-        commande_args[i] = strdup(token);
-        if (commande_args[i] == NULL) exit(EXIT_FAILURE);
+    for (char *x = strtok(commande, " "); x != NULL; x = strtok(NULL, " ")) {
+        commande_args[i] = x;
+        if (!commande_args[i]) exit(EXIT_FAILURE);
         i++;
     }
-    free(copy2);
+
     commande_args[i] = NULL;
 
     return commande_args;
