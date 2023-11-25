@@ -218,7 +218,7 @@ int main(int argc, char const *argv[]){
         
         input = readline(path);
         if(input == NULL){
-            exit(0);
+            exit(last_return_code);
         }
         free(path);
         if(strlen(input) == 0){
