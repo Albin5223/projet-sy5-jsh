@@ -18,14 +18,30 @@
 #define TRONCATURE_SHELL 30
 
 /**
- * @brief Truncate the string to the size of TRONCATURE_SHELL
+ * @brief Return the number of digits of the number n (including the signe)
+*/
+int number_length(int n){
+    int i = 0;
+    if(n < 0){
+        i++;
+        n = -n;
+    }
+    do {
+        n = n/10;
+        i++;
+    } while(n != 0);
+    return i;
+}
+
+/**
+ * @brief Truncate the string to the size of truncate_size
  * @param original The string to truncate
 */
-void truncate_string(char **original) {
+void truncate_string(char **original, int truncate_size) {
     int len = strlen(*original);
-    if (len > TRONCATURE_SHELL-3) {
-        char *new_string = malloc(TRONCATURE_SHELL+1); // 3 dots + TRONCATURE_SHELL-3 characters + null terminator
-        snprintf(new_string, 31, "[%d]...%s",NUMBER_OF_JOBS, *original + len - 22);
+    if (len > truncate_size-3) {    // minus 3 because of the 3 dots
+        char *new_string = malloc(truncate_size+1); // 3 dots + truncate_size-3 characters + null terminator
+        snprintf(new_string, truncate_size+1, "...%s",(*original + len) - (truncate_size-3));
         free(*original);
         *original = new_string;
     }
@@ -187,17 +203,31 @@ int execute_cd(char **commande_args,char **precedent){
 /**
  * @brief Return the path with the signe (like '$' or '>'), and color the path (without the signe)
 */
-char *path_shell(char *signe, enum color c){
+char *path_shell(char *signe, enum color job, enum color path){
+
+    char *jobs = malloc(sizeof(char)*(2+number_length(NUMBER_OF_JOBS)+1));  // Allocating the string for the jobs (2 brackets + number of jobs + null terminator)
+    sprintf(jobs,"[%d]",NUMBER_OF_JOBS);  // Adding the number of jobs to the string
     char *pwd = execute_pwd();  // Getting the path
-    truncate_string(&pwd);  // Truncating the path
-    color_switch(&pwd,c);    // Adding the color to the path (and not the signe)
-    pwd = realloc(pwd, sizeof(char)*(strlen(pwd) + strlen(signe) + 1));   // Increasing the size of the path to add the signe
-    if (pwd == NULL) {
+
+    truncate_string(&pwd, TRONCATURE_SHELL-strlen(jobs)-strlen(signe));  // Truncating the path if it's too long
+
+    color_switch(&jobs, job);   // Coloring the jobs
+    color_switch(&pwd, path);   // Coloring the path
+
+    char *prompt = calloc(sizeof(char),strlen(pwd)+strlen(jobs)+strlen(signe)+1);  // Allocating the prompt
+    if (prompt == NULL) {
         printf("Error in 'path_shell' : couldn't realloc...\n");
         exit(1);
     }
-    strcat(pwd, signe);   // Adding the signe to the path
-    return pwd;
+
+    strcat(prompt, jobs);  // Adding the jobs
+    strcat(prompt, pwd);   // Adding the path
+    strcat(prompt, signe); // Adding the signe
+
+    free(pwd);  // Freeing the path
+    free(jobs); // Freeing the jobs
+
+    return prompt;
 }
 
 int main(int argc, char const *argv[]){
@@ -211,7 +241,7 @@ int main(int argc, char const *argv[]){
     rl_outstream = stderr;
 
     while(1){
-        char *path = path_shell("$ ",blue);
+        char *path = path_shell("$ ",green,blue);
         
         input = readline(path);
         if(input == NULL){
