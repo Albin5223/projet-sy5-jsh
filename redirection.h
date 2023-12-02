@@ -1,3 +1,6 @@
+#ifndef REDIRECTION_H
+#define REDIRECTION_H
+
 #define SIMPLE ">"
 #define FORCE ">|"
 #define SANS_ECRASEMENT ">>"
@@ -10,3 +13,5 @@ int numberOfRedirection(char **commande);
 int isRedirection(char **commande);
 char ** getCommandeOfRedirection (char **commande);
 int* getDescriptorOfRedirection(char **commande); 
+
+#endif

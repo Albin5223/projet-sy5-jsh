@@ -2,95 +2,23 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
 #include "redirection.h"
+#include "colors.h"
+#include "utils.h"
+#include "jobs.h"
 
 /**
  * Represents the maximum size of the path
 */
 #define MAX_PATH_SIZE 2048
-
-#define NUMBER_OF_JOBS 0
 /**
  * Represents the maximum size of shell_path
 */
 #define TRONCATURE_SHELL 30
-
-/**
- * @brief Return the number of digits of the number n (including the signe)
-*/
-int number_length(int n){
-    int i = 0;
-    if(n < 0){
-        i++;
-        n = -n;
-    }
-    do {
-        n = n/10;
-        i++;
-    } while(n != 0);
-    return i;
-}
-
-/**
- * @brief Truncate the string to the size of truncate_size
- * @param original The string to truncate
-*/
-void truncate_string(char **original, int truncate_size) {
-    int len = strlen(*original);
-    if (len > truncate_size-3) {    // minus 3 because of the 3 dots
-        char *new_string = malloc(truncate_size+1); // 3 dots + truncate_size-3 characters + null terminator
-        snprintf(new_string, truncate_size+1, "...%s",(*original + len) - (truncate_size-3));
-        free(*original);
-        *original = new_string;
-    }
-}
-
-/**
- * Represents the different colors that can be used
-*/
-enum color {red,green,blue,yellow,cyan,white};
-
-/**
- * @brief Add the color to the string, and put the color back to white at the end of the string
- * @param string The string to color
- * @param c The color to add
-*/
-void color_switch(char **string,enum color c){
-
-    char *new_string = calloc((strlen(*string) + 2*strlen("\033[37m") + 1), sizeof(char));  // Allocating the new string
-
-    const char *color;  // The color to add
-    switch(c){  // Choosing the color
-        case red:
-            color = "\033[31m";
-            break;
-        case green:
-            color = "\033[32m";
-            break;
-        case blue:
-            color = "\033[34m";
-            break;
-        case yellow:
-            color = "\033[33m";
-            break;
-        case cyan:
-            color = "\033[36m";
-            break;
-        default:    // white
-            color = "\033[37m";
-            break;
-    }
-
-    strcat(new_string,color);   // Adding the color
-    strcat(new_string,*string); // Adding the string
-    strcat(new_string,"\033[37m");  // Adding the white color
-
-    free(*string);  // Freeing the old string
-    *string = new_string;   // Changing the pointer to the new string
-}
 
 /**
  * @brief Execute the command 'pwd' and return the path
@@ -206,8 +134,8 @@ int execute_cd(char **commande_args,char **precedent){
 */
 char *path_shell(char *signe, enum color job, enum color path){
 
-    char *jobs = malloc(sizeof(char)*(2+number_length(NUMBER_OF_JOBS)+1));  // Allocating the string for the jobs (2 brackets + number of jobs + null terminator)
-    sprintf(jobs,"[%d]",NUMBER_OF_JOBS);  // Adding the number of jobs to the string
+    char *jobs = malloc(sizeof(char)*(2+number_length(getNbJobs())+1));  // Allocating the string for the jobs (2 brackets + number of jobs + null terminator)
+    sprintf(jobs,"[%d]",getNbJobs());  // Adding the number of jobs to the string
     char *pwd = execute_pwd();  // Getting the path
 
     truncate_string(&pwd, TRONCATURE_SHELL-strlen(jobs)-strlen(signe));  // Truncating the path if it's too long
@@ -243,6 +171,7 @@ int main(int argc, char const *argv[]){
     int copie_sortie_standart = dup(STDOUT_FILENO);
     int copie_sortie_erreur = dup(STDERR_FILENO);
 
+    bool isBG = false;
    
     int last_return_code = 0;
     
@@ -250,16 +179,30 @@ int main(int argc, char const *argv[]){
     rl_outstream = stderr;
 
     while(1){
+        isBG = false;
         descripteur_sortie_erreur = -1;
         descripteur_sortie_standart = -1;
-        char *path = path_shell("$ ",green,blue);
+        char *path = path_shell("$ ",magenta,blue);
         
         input = readline(path);
         if(input == NULL){
             exit(last_return_code);
         }
         free(path);
-        if(strlen(input) == 0){
+
+        remove_last_spaces(&input); // Removing the last spaces only after verifying that the input is not empty
+        if(strlen(input) == 0){    // If the input is empty after removing the last spaces, we continue
+            continue;
+        }
+
+        if(input[strlen(input)-1] == '&'){
+            isBG = true;
+            remove_last_char(&input);
+            remove_last_spaces(&input);
+        }
+
+        if(strlen(input) == 0){    // If the input is empty after removing the &, we continue
+            fprintf(stderr,"erreur avec commande : &\n");
             continue;
         }
 

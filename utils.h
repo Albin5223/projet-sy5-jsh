@@ -1,0 +1,9 @@
+#ifndef UTILS_H
+#define UTILS_H
+
+int number_length(int n);
+void truncate_string(char **original, int truncate_size);
+void remove_last_spaces(char **str);
+void remove_last_char(char **str);
+
+#endif
