@@ -256,9 +256,10 @@ int main(int argc, char const *argv[]){
         isBG = false;
         descripteur_sortie_erreur = -1;
         descripteur_sortie_standart = -1;
-        char *path = path_shell(" $ ", magenta, blue);
+        char *path = path_shell("$ ", magenta, blue);
         
         input = readline(path);
+        add_history(input);
         if(input == NULL){
             exit(last_return_code);
         }
@@ -281,9 +282,24 @@ int main(int argc, char const *argv[]){
         }
 
         char **commande_args;
-        add_history(input);
-        
         commande_args = get_tab_of_commande(input);
+
+        // Pour moi ce que j'ai annoté fait la mm chose que l.268 à 282 dit moi si je me trompe et ce que t'en penses
+        // if(commande_args[0] == NULL){
+        //     continue;
+        // }
+
+        // if (strcmp(commande_args[len(commande_args)-1],"&") == 0){
+        //     isBG = true;
+        //     commande_args[len(commande_args)-1] = NULL;
+        // }
+
+        // if (commande_args[0] == NULL){
+        //     fprintf(stderr,"erreur avec commande : &\n");
+        //     continue;
+        // }
+
+        
         /*
         * Mise en place des descripteurs en cas de redirections
         * On sait que la dernière redirection a la priorité, donc on a juste besoin de 2 descripteur, le premier pour la redirection pour la sortie standart

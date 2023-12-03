@@ -67,6 +67,10 @@ void remove_last_char(char **str) {
     (*str)[len-1] = '\0';
 }
 
+/**
+ * @brief return the length of the tab of string
+ * @param str The tab of string
+*/
 int len (char ** str) {
     int i = 0;
     while (str[i] != NULL) {
