@@ -6,6 +6,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
+
 #include "redirection.h"
 #include "colors.h"
 #include "utils.h"
@@ -37,9 +38,9 @@ char *execute_pwd(){
     return pwd;
 }
 
-char** get_tab_of_commande  (char* commande){
+char** get_tab_of_commande (char* commande){
     char *copy1 = strdup(commande);
-    if (!copy1) exit(EXIT_FAILURE);
+    if (!copy1) exit(1);
 
     int size = 0;
     for (char *x = strtok(copy1, " "); x != NULL; x = strtok(NULL, " ")) {
@@ -48,36 +49,110 @@ char** get_tab_of_commande  (char* commande){
     free(copy1);
 
     char **commande_args= malloc(sizeof(char*) * (size + 1));
-    if (commande_args == NULL) exit(EXIT_FAILURE);
+    if (commande_args == NULL) exit(1);
 
     int i = 0;
     for (char *x = strtok(commande, " "); x != NULL; x = strtok(NULL, " ")) {
         commande_args[i] = x;
-        if (!commande_args[i]) exit(EXIT_FAILURE);
+        if (!commande_args[i]) exit(1);
         i++;
     }
-
     commande_args[i] = NULL;
 
     return commande_args;
 }
 
-int execute_commande_externe(char **commande_args){
-    pid_t pid = fork();
+int doPipe(char **commande_args, int nb){
+    int pipes_fd[nb - 1][2];
+    pid_t pid;
+    int i;
 
-    if(pid == 0){
-        execvp(commande_args[0], commande_args);
-        fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
-        exit(EXIT_FAILURE);
-    }
-    else{
-        int s;
-        waitpid(pid,&s,0);
-        if(WIFEXITED(s)){
-            return WEXITSTATUS(s);
+    for (i = 0; i < nb - 1; i++) {
+        if (pipe(pipes_fd[i]) != 0){
+            perror("doPipe");
+            exit(1);
         }
-        return 0;
     }
+
+    for (i = 0; i < nb; i++) {
+        pid = fork();
+        if (pid == -1) {
+            perror("doPipe, fork");
+            exit(1);
+        }
+
+        if (pid == 0) {
+            if (i > 0) {
+                if (dup2(pipes_fd[i - 1][0], STDIN_FILENO) < 0) {
+                    perror("doPipe, dup2");
+                    exit(1);
+                }
+            }
+
+            if (i < nb - 1) {
+                if (dup2(pipes_fd[i][1], STDOUT_FILENO) < 0) {
+                    perror("doPipe, dup2");
+                    exit(1);
+                }
+            }
+
+            for (int j = 0; j < nb - 1; j++) {
+                close(pipes_fd[j][0]);
+                close(pipes_fd[j][1]);
+            }
+
+            char **commande_tab_i = get_tab_of_commande(commande_args[i]);
+            execvp(commande_tab_i[0], commande_tab_i);
+
+            fprintf(stderr,"erreur avec commande : %s\n",commande_tab_i[0]);
+            exit(1);
+        }
+    }
+
+    for (i = 0; i < nb - 1; i++) {
+        close(pipes_fd[i][0]);
+        close(pipes_fd[i][1]);
+    }
+
+    int status;
+    int ret = 0;
+    for (i = 0; i < nb; i++) {
+        waitpid(-1, &status, 0);
+        if (WIFEXITED(status)) {
+            int child_ret = WEXITSTATUS(status);
+            if (child_ret != 0) {
+                ret = child_ret;
+            }
+        }
+    }
+
+    return ret;
+}
+
+int execute_commande_externe(char **commande_args){
+    int n = nbPipes(commande_args);
+    if (n != 0){
+        char ** tab_no_pipes = noPipe(commande_args, n);
+        int ret = doPipe(tab_no_pipes, n + 1);
+        free_tab(tab_no_pipes);
+        return ret;
+    } else {
+        pid_t pid = fork();
+
+        if(pid == 0){
+            execvp(commande_args[0], commande_args);
+            fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
+            exit(1);
+        }
+        else{
+            int s;
+            waitpid(pid,&s,0);
+            if(WIFEXITED(s)){
+                return WEXITSTATUS(s);
+            }
+            return 0;
+        }
+    }    
 }
 
 int change_precedent(char **prec,char *new){
@@ -159,7 +234,6 @@ char *path_shell(char *signe, enum color job, enum color path){
     return prompt;
 }
 
-
 int main(int argc, char const *argv[]){
     
     char *input;
@@ -182,7 +256,7 @@ int main(int argc, char const *argv[]){
         isBG = false;
         descripteur_sortie_erreur = -1;
         descripteur_sortie_standart = -1;
-        char *path = path_shell("$ ",magenta,blue);
+        char *path = path_shell(" $ ", magenta, blue);
         
         input = readline(path);
         if(input == NULL){
@@ -218,7 +292,7 @@ int main(int argc, char const *argv[]){
         * Dans cette condition, si il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
         * avec la suite du code
         */
-        if(isRedirection(commande_args)!=-1){
+        if(isRedirection(commande_args) != -1){
             int *fd = getDescriptorOfRedirection(commande_args);
             if(fd[0] != -1){
                 descripteur_sortie_standart = fd[0];
@@ -229,9 +303,8 @@ int main(int argc, char const *argv[]){
             //On récupère la commande cad : comm > fic, 
             commande_args = getCommandeOfRedirection(commande_args);
             free(fd);
-            
         }
-        
+
         if(strcmp(commande_args[0],"exit") == 0){
             if(commande_args[1] != NULL){
                 exit(atoi(commande_args[1]));

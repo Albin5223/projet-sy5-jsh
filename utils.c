@@ -18,6 +18,18 @@ int number_length(int n){
     return i;
 }
 
+/*
+* @brief Free the tab of string    
+*/
+void free_tab(char ** tab) {
+    int i = 0;
+    while (tab[i] != NULL) {
+        free(tab[i]);
+        i++;
+    }
+    free(tab);
+}
+
 /**
  * @brief Truncate the string to the size of truncate_size
  * @param original The string to truncate
@@ -53,4 +65,12 @@ void remove_last_spaces(char **str) {
 void remove_last_char(char **str) {
     int len = strlen(*str);
     (*str)[len-1] = '\0';
+}
+
+int len (char ** str) {
+    int i = 0;
+    while (str[i] != NULL) {
+        i++;
+    }
+    return i;
 }
