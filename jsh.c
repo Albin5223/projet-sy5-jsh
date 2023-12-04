@@ -10,6 +10,7 @@
 #include "redirection.h"
 #include "colors.h"
 #include "utils.h"
+#include "pipe.h"
 #include "jobs.h"
 
 /**
@@ -38,119 +39,38 @@ char *execute_pwd(){
     return pwd;
 }
 
-char** get_tab_of_commande (char* commande){
-    char *copy1 = strdup(commande);
-    if (!copy1) exit(1);
-
-    int size = 0;
-    for (char *x = strtok(copy1, " "); x != NULL; x = strtok(NULL, " ")) {
-        size++;
-    }
-    free(copy1);
-
-    char **commande_args= malloc(sizeof(char*) * (size + 1));
-    if (commande_args == NULL) exit(1);
-
-    int i = 0;
-    for (char *x = strtok(commande, " "); x != NULL; x = strtok(NULL, " ")) {
-        commande_args[i] = x;
-        if (!commande_args[i]) exit(1);
-        i++;
-    }
-    commande_args[i] = NULL;
-
-    return commande_args;
-}
-
-int doPipe(char **commande_args, int nb){
-    int pipes_fd[nb - 1][2];
-    pid_t pid;
-    int i;
-
-    for (i = 0; i < nb - 1; i++) {
-        if (pipe(pipes_fd[i]) != 0){
-            perror("doPipe");
-            exit(1);
-        }
-    }
-
-    for (i = 0; i < nb; i++) {
-        pid = fork();
-        if (pid == -1) {
-            perror("doPipe, fork");
-            exit(1);
-        }
-
-        if (pid == 0) {
-            if (i > 0) {
-                if (dup2(pipes_fd[i - 1][0], STDIN_FILENO) < 0) {
-                    perror("doPipe, dup2");
-                    exit(1);
-                }
-            }
-
-            if (i < nb - 1) {
-                if (dup2(pipes_fd[i][1], STDOUT_FILENO) < 0) {
-                    perror("doPipe, dup2");
-                    exit(1);
-                }
-            }
-
-            for (int j = 0; j < nb - 1; j++) {
-                close(pipes_fd[j][0]);
-                close(pipes_fd[j][1]);
-            }
-
-            char **commande_tab_i = get_tab_of_commande(commande_args[i]);
-            execvp(commande_tab_i[0], commande_tab_i);
-
-            fprintf(stderr,"erreur avec commande : %s\n",commande_tab_i[0]);
-            exit(1);
-        }
-    }
-
-    for (i = 0; i < nb - 1; i++) {
-        close(pipes_fd[i][0]);
-        close(pipes_fd[i][1]);
-    }
-
-    int status;
-    int ret = 0;
-    for (i = 0; i < nb; i++) {
-        waitpid(-1, &status, 0);
-        if (WIFEXITED(status)) {
-            int child_ret = WEXITSTATUS(status);
-            if (child_ret != 0) {
-                ret = child_ret;
-            }
-        }
-    }
-
-    return ret;
-}
-
-int execute_commande_externe(char **commande_args){
+int execute_commande_externe(char **commande_args, bool isBackground){
     int n = nbPipes(commande_args);
     if (n != 0){
-        char ** tab_no_pipes = noPipe(commande_args, n);
-        int ret = doPipe(tab_no_pipes, n + 1);
-        free_tab(tab_no_pipes);
-        return ret;
-    } else {
-        pid_t pid = fork();
-
-        if(pid == 0){
-            execvp(commande_args[0], commande_args);
-            fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
-            exit(1);
+        if(isBackground){
+            return add_job(commande_args,true);
         }
         else{
-            int s;
-            waitpid(pid,&s,0);
-            if(WIFEXITED(s)){
-                return WEXITSTATUS(s);
+            char ** tab_no_pipes = noPipe(commande_args, n);
+            int ret = doPipe(tab_no_pipes, n + 1);
+            free_tab(tab_no_pipes);
+            return ret;
+        }
+    } else {
+        if(isBackground){
+            return add_job(commande_args,false);
+        }
+        else{
+            pid_t pid = fork();
+
+            if(pid == 0){
+                execvp(commande_args[0], commande_args);
+                fprintf(stderr,"erreur avec commande : %s\n",commande_args[0]);
+                exit(1);
             }
-            return 0;
+            else{
+                int s;
+                waitpid(pid,&s,0);
+                if(WIFEXITED(s)){
+                    return WEXITSTATUS(s);
+                }
+                return 0;
+            }
         }
     }    
 }
@@ -256,7 +176,7 @@ int main(int argc, char const *argv[]){
         isBG = false;
         descripteur_sortie_erreur = -1;
         descripteur_sortie_standart = -1;
-        char *path = path_shell("$ ", magenta, blue);
+        char *path = path_shell("$ ", green, blue);
         
         input = readline(path);
         add_history(input);
@@ -336,8 +256,60 @@ int main(int argc, char const *argv[]){
         else if(strcmp(commande_args[0],"cd") == 0){
             last_return_code = execute_cd(commande_args, &precedent);
         }
+        else if(strcmp(commande_args[0],"jobs") == 0){
+            print_jobs();
+        }
+        /*
+        else if(strcmp(commande_args[0],"fg") == 0){
+            if(commande_args[1] == NULL){
+                fprintf(stderr,"Erreur: fg prend un argument\n");
+                continue;
+            }
+            int id = atoi(commande_args[1]);
+            if(id == 0){
+                fprintf(stderr,"Erreur: fg prend un argument entier\n");
+                continue;
+            }
+            if(id > getNbJobs()){
+                fprintf(stderr,"Erreur: fg prend un argument entre 1 et %d\n",getNbJobs());
+                continue;
+            }
+            int pid = getPidById(id);
+            if(pid == -1){
+                fprintf(stderr,"Erreur: fg prend un argument entre 1 et %d\n",getNbJobs());
+                continue;
+            }
+            int status;
+            waitpid(pid,&status,0);
+            if(WIFEXITED(status)){
+                last_return_code = WEXITSTATUS(status);
+            }
+            remove_job(pid);
+        }
+        else if(strcmp(commande_args[0],"bg") == 0){
+            if(commande_args[1] == NULL){
+                fprintf(stderr,"Erreur: bg prend un argument\n");
+                continue;
+            }
+            int id = atoi(commande_args[1]);
+            if(id == 0){
+                fprintf(stderr,"Erreur: bg prend un argument entier\n");
+                continue;
+            }
+            if(id > getNbJobs()){
+                fprintf(stderr,"Erreur: bg prend un argument entre 1 et %d\n",getNbJobs());
+                continue;
+            }
+            int pid = getPidById(id);
+            if(pid == -1){
+                fprintf(stderr,"Erreur: bg prend un argument entre 1 et %d\n",getNbJobs());
+                continue;
+            }
+            kill(pid,SIGCONT);
+        }
+        */
         else{
-            last_return_code = execute_commande_externe(commande_args);
+            last_return_code = execute_commande_externe(commande_args, isBG);
         }
 
         /*

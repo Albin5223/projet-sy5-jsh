@@ -7,7 +7,6 @@
 #define SORTIE_ERREUR "2>"
 #define SORTIE_ERREUR_FORCE "2>|"
 #define SORTIE_ERREUR_SANS_ECRASEMENT "2>>"
-#define PIPE "|"
 
 
 int numberOfRedirection(char **commande);

@@ -7,5 +7,6 @@ void remove_last_spaces(char **str);
 void remove_last_char(char **str);
 int len (char ** str);
 void free_tab(char ** tab);
+char** get_tab_of_commande (char* commande);
 
 #endif

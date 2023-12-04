@@ -41,56 +41,6 @@ int numberOfRedirection(char **commande){
     return number;
 }
 
-int nbPipes(char **commande){
-    int i = 0;
-    int nb = 0;
-    while(1){
-        char *tmp = commande[i];
-        if (tmp == NULL){
-            break;
-        }
-        if(strcmp(tmp,PIPE) == 0){
-            nb++;        
-        }
-        i++;
-    }
-
-    return nb;
-}
-
-char ** noPipe(char ** commande, int nb) {
-    int size = len(commande);
-    char **tab_no_pipes = malloc(sizeof(char*) * ((size - nb) + 1));
-    int j = 0;
-    int tmpSize = 256; 
-    char *tmp = malloc((char) tmpSize);
-    tmp[0] = '\0'; 
-
-    for (int i = 0; i < size; i++) {
-        if (strcmp(commande[i], PIPE) != 0) {
-            if (strlen(tmp) + strlen(commande[i]) + 2 > tmpSize) {
-                tmpSize *= 2;
-                tmp = realloc(tmp, tmpSize);
-            }
-            strcat(tmp, commande[i]);
-            strcat(tmp, " ");
-        } else {
-            tab_no_pipes[j++] = strdup(tmp);
-            tmp[0] = '\0';
-        }
-    }
-
-    if (tmp[0] != '\0') {
-        tab_no_pipes[j++] = strdup(tmp); 
-    }
-
-    tab_no_pipes[j] = NULL; 
-    free(tmp);
-
-    return tab_no_pipes;
-}
-
-
 int isRedirection(char **commande){
     int i = 0;
     while(1){

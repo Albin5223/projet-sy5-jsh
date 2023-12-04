@@ -78,3 +78,27 @@ int len (char ** str) {
     }
     return i;
 }
+
+char** get_tab_of_commande (char* commande){
+    char *copy1 = strdup(commande);
+    if (!copy1) exit(1);
+
+    int size = 0;
+    for (char *x = strtok(copy1, " "); x != NULL; x = strtok(NULL, " ")) {
+        size++;
+    }
+    free(copy1);
+
+    char **commande_args= malloc(sizeof(char*) * (size + 1));
+    if (commande_args == NULL) exit(1);
+
+    int i = 0;
+    for (char *x = strtok(commande, " "); x != NULL; x = strtok(NULL, " ")) {
+        commande_args[i] = x;
+        if (!commande_args[i]) exit(1);
+        i++;
+    }
+    commande_args[i] = NULL;
+
+    return commande_args;
+}
