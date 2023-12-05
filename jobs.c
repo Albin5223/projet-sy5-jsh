@@ -84,11 +84,9 @@ int get_status(int pid) {
     if (result == 0) {
         // Child is still running
         return -1;
-    } else if (result == pid) {
-        // Child has exited or stopped
-        return status;
-    } else {
-        // An error occurred
+    }
+    else {
+        // Child is done
         return status;
     }
 }
@@ -114,6 +112,14 @@ void print_job(Job job) {
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
     printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(get_status(job.pid)), job.cmd);
+    free(job_id);
+}
+
+void print_job_old_status(Job job, int old_status){
+    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
+    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
+    color_switch(&job_id, red);
+    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(old_status), job.cmd);
     free(job_id);
 }
 
@@ -284,8 +290,9 @@ int print_jobs() {
 void verify_done_jobs() {
     int i = 0;
     while (i < job_count){
-        if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, print it and remove it from the list
-            print_job(jobs[i]);
+        int old_status = get_status(jobs[i].pid);
+        if(old_status != -1){  // If the job is not running anymore, print it and remove it from the list
+            print_job_old_status(jobs[i],old_status);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
         else{   // If the job is still running, increment i
