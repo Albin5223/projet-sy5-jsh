@@ -13,6 +13,11 @@
 #include "redirection.h"
 
 typedef struct {
+    char **cmd;
+    bool is_background;
+} Command;
+
+typedef struct {
     int pid;
     char cmd[MAX_CMD_LEN];
     int id;
@@ -22,33 +27,36 @@ Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
 
-char*** split_commands_for_jobs(char **commande_args) {
-    char ***commands = malloc(MAX_COMMANDS * sizeof(char **));
-    int command_count = 0;
-    commands[command_count] = malloc(MAX_ARGS * sizeof(char *));
-    int arg_count = 0;
-
-    for (int i = 0; commande_args[i] != NULL; i++) {
-
-        printf("%s\n", commande_args[i]);
-        
-        if (strcmp(commande_args[i], "&") == 0) {
-            commands[command_count][arg_count] = commande_args[i]; // Include the "&" in the command
-            arg_count++;
-            commands[command_count][arg_count] = NULL; // End the current command
-            command_count++;
-            commands[command_count] = malloc(MAX_ARGS * sizeof(char *)); // Start a new command
-            arg_count = 0;
-        } else {
-            commands[command_count][arg_count] = commande_args[i];
-            arg_count++;
+Command *split_commands_for_jobs(char **commande_args) {
+    Command *commands = malloc(sizeof(Command) * MAX_COMMANDS);
+    int i = 0;
+    int j = 0;
+    int k = 0;
+    commands[0].cmd = malloc(sizeof(char*) * MAX_ARGS);
+    commands[0].is_background = false;
+    while (1) {
+        char *tmp = commande_args[i];
+        if (tmp == NULL) {
+            commands[j].cmd[k] = NULL;
+            break;
         }
+        if (strcmp(tmp, "&") == 0) {
+            commands[j].cmd[k] = NULL;
+            commands[j].is_background = true;
+            j++;
+            k = 0;
+            commands[j].cmd = malloc(sizeof(char*) * MAX_ARGS);
+            commands[j].is_background = false;
+        } else {
+            commands[j].cmd[k] = tmp;
+            k++;
+        }
+        i++;
     }
-    commands[command_count][arg_count] = NULL; // End the last command
-    commands[command_count + 1] = NULL; // End the list of commands
-
+    commands[j+1].cmd = NULL;
     return commands;
 }
+
 
 void free_splited_commands(char ***commands) {
     for (int i = 0; commands[i] != NULL; i++) {
@@ -123,7 +131,7 @@ int set_first_free_id() {
     return -1;
 }
 
-int add_job(char **commande_args, bool is_background, bool has_pipe) {
+int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
     jobs[job_count].cmd[0] = '\0'; // Start with an empty string
 
     for (int i = 0; commande_args[i] != NULL; i++) {
@@ -219,11 +227,23 @@ int add_job(char **commande_args, bool is_background, bool has_pipe) {
     return 0;
 }
 
+int add_job(char **commande_args, bool has_pipe) {
+    Command *commands = split_commands_for_jobs(commande_args);
+    for (int i = 0; commands[i].cmd != NULL; i++) {
+        int status = add_job_command(commands[i].cmd, commands[i].is_background, has_pipe);
+        if (status != 0) {
+            return status;
+        }
+    }
+    free(commands);
+    return 0;
+}
+
 /**
  * @brief Remove the job with the given pid
  * @param pid The pid of the job to remove
 */
-void remove_job(int pid) {
+int remove_job(int pid) {
     for (int i = 0; i < job_count; i++) {
         if (jobs[i].pid == pid) {
             id_taken[jobs[i].id] = false;
@@ -232,26 +252,30 @@ void remove_job(int pid) {
                 jobs[j] = jobs[j + 1];
             }
             job_count--;
-            return;
+            return 0;
         }
     }
     printf("Error: job not found.\n");
+    return 1;
 }
 
 /**
  * @brief Print the list of jobs
 */
-void print_jobs() {
+int print_jobs() {
     int i = 0;
     while (i < job_count){
         print_job(jobs[i]);
         if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
-            remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
+            if(remove_job(jobs[i].pid) != 0){
+                return 1;
+            }
         }
         else{   // If the job is still running, increment i
             i++;
         }
     }
+    return 0;
 }
 
 /**

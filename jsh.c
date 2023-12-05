@@ -39,13 +39,13 @@ char *execute_pwd(){
     return pwd;
 }
 
-int execute_commande_externe(char **commande_args, bool isBackground){
+int execute_commande_externe(char **commande_args){
     int n = nbPipes(commande_args); //On regarde le nombre de pipes
     if(n != 0){ //Si il y a des pipes alors on execute la fonction add_jobs avec true en parametre
-        return add_job(commande_args,isBackground,true);
+        return add_job(commande_args,true);
     }
     else{ //sinon on execute la fonction add_jobs avec false en parametre
-        return add_job(commande_args,isBackground,false);
+        return add_job(commande_args,false);
     }
 }
 
@@ -132,8 +132,6 @@ int main(int argc, char const *argv[]){
     
     char *input;
     char *precedent = execute_pwd();
-
-    bool isBG = false;
    
     int last_return_code = 0;
     
@@ -143,7 +141,6 @@ int main(int argc, char const *argv[]){
     while(1){
         verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
 
-        isBG = false;
         char *path = path_shell("$ ", green, blue);
         
         input = readline(path);
@@ -153,82 +150,30 @@ int main(int argc, char const *argv[]){
         }
         free(path);
 
-
-/*
         remove_last_spaces(&input); // Removing the last spaces only after verifying that the input is not empty
         if(strlen(input) == 0){    // If the input is empty after removing the last spaces, we continue
             continue;
         }
 
-
-        if(input[strlen(input)-1] == '&'){
-            isBG = true;
-            remove_last_char(&input);
-            remove_last_spaces(&input);
-        }
-        
-
-        if(strlen(input) == 0){    // If the input is empty after removing the &, we continue
-            fprintf(stderr,"erreur avec commande : &\n");
-            continue;
-        }*/
-
         char **commande_args;
         commande_args = get_tab_of_commande(input);
-
-        char ***commands = split_commands_for_jobs(commande_args);// On sépare les commandes par & mais on n'enleve pas les &
-        int nb_commands = len_triple(commands); // On récupère le nombre de commandes
-        printf("nb_commands : %d\n",nb_commands);
-
-        for (int i = 0; i < nb_commands; i++) {
-            isBG = false;
-            if(commands[i][len(commands[i])-1][0] == '&'){ //On regarde si la commande est en bg
-                if(strlen(commands[i][len(commands[i])-1]) != 1){
-                    fprintf(stderr,"erreur avec commande : &   ---%s---- \n",commands[i][len(commands[i])-1]);
-                    continue;
-                }
-                isBG = true;
-                commands[i][len(commands[i])-1] = NULL; //On enleve le & de la commande et on met null a la place
-            }
-            if (strcmp(commands[i][0], "exit") == 0) { // Application des commandes internes
-                if (commands[i][1] != NULL) {
-                    exit(atoi(commands[i][1]));
-                } else {
-                    exit(last_return_code);
-                }
-            } else if (strcmp(commands[i][0], "?") == 0) {
-                printf("%d\n", last_return_code);
-                last_return_code = 0;
-            } else if (strcmp(commands[i][0], "cd") == 0) {
-                last_return_code = execute_cd(commands[i], &precedent);
-            } else if (strcmp(commands[i][0], "jobs") == 0) {
-                print_jobs();
-            } else { // Application des commandes externes en prenant en compte si il se fait en background ou pas
-                last_return_code = execute_commande_externe(commands[i], isBG);
-            }
+        if(commande_args == NULL){
+            continue;
         }
 
-        // Pour moi ce que j'ai annoté fait la mm chose que l.268 à 282 dit moi si je me trompe et ce que t'en penses
-        // if(commande_args[0] == NULL){
-        //     continue;
-        // }
-
-        // if (strcmp(commande_args[len(commande_args)-1],"&") == 0){
-        //     isBG = true;
-        //     commande_args[len(commande_args)-1] = NULL;
-        // }
-
-        // if (commande_args[0] == NULL){
-        //     fprintf(stderr,"erreur avec commande : &\n");
-        //     continue;
-        // }
-
-    /*
         if(strcmp(commande_args[0],"exit") == 0){
             if(commande_args[1] != NULL){
+                free(commande_args);
+                free(input);
+                free(precedent);
+                clear_history();
                 exit(atoi(commande_args[1]));
             }
             else{
+                free(commande_args);
+                free(input);
+                free(precedent);
+                clear_history();
                 exit(last_return_code);
             }
         }
@@ -240,65 +185,16 @@ int main(int argc, char const *argv[]){
             last_return_code = execute_cd(commande_args, &precedent);
         }
         else if(strcmp(commande_args[0],"jobs") == 0){
-            print_jobs();
+            last_return_code = print_jobs();
         }
-        
-        else if(strcmp(commande_args[0],"fg") == 0){
-            if(commande_args[1] == NULL){
-                fprintf(stderr,"Erreur: fg prend un argument\n");
-                continue;
-            }
-            int id = atoi(commande_args[1]);
-            if(id == 0){
-                fprintf(stderr,"Erreur: fg prend un argument entier\n");
-                continue;
-            }
-            if(id > getNbJobs()){
-                fprintf(stderr,"Erreur: fg prend un argument entre 1 et %d\n",getNbJobs());
-                continue;
-            }
-            int pid = getPidById(id);
-            if(pid == -1){
-                fprintf(stderr,"Erreur: fg prend un argument entre 1 et %d\n",getNbJobs());
-                continue;
-            }
-            int status;
-            waitpid(pid,&status,0);
-            if(WIFEXITED(status)){
-                last_return_code = WEXITSTATUS(status);
-            }
-            remove_job(pid);
-        }
-        else if(strcmp(commande_args[0],"bg") == 0){
-            if(commande_args[1] == NULL){
-                fprintf(stderr,"Erreur: bg prend un argument\n");
-                continue;
-            }
-            int id = atoi(commande_args[1]);
-            if(id == 0){
-                fprintf(stderr,"Erreur: bg prend un argument entier\n");
-                continue;
-            }
-            if(id > getNbJobs()){
-                fprintf(stderr,"Erreur: bg prend un argument entre 1 et %d\n",getNbJobs());
-                continue;
-            }
-            int pid = getPidById(id);
-            if(pid == -1){
-                fprintf(stderr,"Erreur: bg prend un argument entre 1 et %d\n",getNbJobs());
-                continue;
-            }
-            kill(pid,SIGCONT);
-        }
-        
         else{
-            last_return_code = execute_commande_externe(commande_args, isBG);
+            last_return_code = execute_commande_externe(commande_args);
         }
-        */
         
         free(commande_args);
         free(input);
     }
+
     free(precedent);
     clear_history();
     
