@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <signal.h>
 #include "jobs.h"
 #include "utils.h"
 #include "colors.h"
@@ -19,23 +20,47 @@ Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
 
+int get_pid_by_id(int id) {
+    for (int i = 0; i < job_count; i++) {
+        if (jobs[i].id == id) {
+            return jobs[i].pid;
+        }
+    }
+    return -1;
+}
+
 /**
  * @brief Return the status of the job with the given pid
  * @param pid The pid of the job
 */
 int get_status(int pid) {
     int status;
-    waitpid(pid, &status, WNOHANG);
-    return status;
+    int result = waitpid(pid, &status, WNOHANG);
+    if (result == 0) {
+        // Child is still running
+        return -1;
+    } else if (result == pid) {
+        // Child has exited or stopped
+        return status;
+    } else {
+        // An error occurred
+        return -2;
+    }
 }
 
 const char *status_to_string(int status) {
-    if (WIFEXITED(status)) {
-        return "Done";
-    }else if (WIFSTOPPED(status)) {
-        return "Stopped";
-    }else {
+    if (status == -1) {
         return "Running";
+    } else if (status == -2) {
+        return "Error";
+    } else if (WIFEXITED(status)) {
+        return "Done";
+    } else if (WIFSTOPPED(status)) {
+        return "Stopped";
+    } else if (WIFSIGNALED(status)) {
+        return "Terminated by signal";
+    } else {
+        return "Unknown";
     }
 }
 
@@ -53,6 +78,53 @@ int set_first_free_id() {
     return -1;
 }
 
+int execute_command(char **commande_args, bool is_background, bool has_pipe) {
+    jobs[job_count].cmd[0] = '\0'; // Start with an empty string
+
+    for (int i = 0; commande_args[i] != NULL; i++) {
+        if (i > 0) {
+            strcat(jobs[job_count].cmd, " "); // Add a space before each argument after the first
+        }
+        strcat(jobs[job_count].cmd, commande_args[i]);
+    }
+
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+        if (is_background) { // If the command is run in the background
+            setpgid(0, 0); // Set the process group ID to the process ID
+        }
+        if (has_pipe) { // If the command has a pipe, we need to do the pipe
+            int n = nbPipes(commande_args);
+            char ** tab_no_pipes = noPipe(commande_args, n);
+            int ret = doPipe(tab_no_pipes, n + 1);
+            free_tab(tab_no_pipes);
+            return ret;
+        }
+        else{   // If the command does not have a pipe, we can just execute it
+            execvp(commande_args[0], commande_args);
+            fprintf(stderr,"Error: command not found.\n");
+            exit(0);
+        }
+    }
+    else if (pid < 0) { // Error
+        fprintf(stderr,"Error: fork failed.\n");
+        exit(0);
+    }
+    else {  // Parent process
+        jobs[job_count].pid = pid;
+        jobs[job_count].id = set_first_free_id();
+
+        if (!is_background) { // If the command is not run in the background
+            int status;
+            waitpid(pid, &status, 0); // Wait for the child process to finish
+        }
+
+        printf("[%d] %d\n", jobs[job_count].id, jobs[job_count].pid);
+        job_count++;
+    }
+    return 0;
+}
+
 /**
  * @brief Add a job to the list of jobs
  * @param pid The pid of the job
@@ -60,49 +132,8 @@ int set_first_free_id() {
  * @param status The status of the job
 */
 int add_job(char **commande_args, bool has_pipe) {
-    if (job_count < MAX_JOBS) {
-        
-        jobs[job_count].cmd[0] = '\0'; // Start with an empty string
+    return execute_command(commande_args, true, has_pipe);
 
-        for (int i = 0; commande_args[i] != NULL; i++) {
-            if (i > 0) {
-                strcat(jobs[job_count].cmd, " "); // Add a space before each argument after the first
-            }
-            strcat(jobs[job_count].cmd, commande_args[i]);
-        }
-
-        pid_t pid = fork();
-        if (pid == 0) {
-            if (has_pipe) {
-                int n = nbPipes(commande_args);
-                char ** tab_no_pipes = noPipe(commande_args, n);
-                int ret = doPipe(tab_no_pipes, n + 1);
-                free_tab(tab_no_pipes);
-                return ret;
-            }
-            else{
-                execvp(commande_args[0], commande_args);
-                fprintf(stderr,"Error: command not found.\n");
-                exit(0);
-            }
-        }
-        else if (pid < 0) {
-            fprintf(stderr,"Error: fork failed.\n");
-            exit(0);
-        }
-        else {
-            jobs[job_count].pid = pid;
-            jobs[job_count].id = set_first_free_id();
-
-            printf("[%d] %d\n", jobs[job_count].id, jobs[job_count].pid);
-
-            job_count++;
-            return 0;
-        }
-    } else {
-        fprintf(stderr,"Error: job list is full.\n");
-        return -1;
-    }
 }
 
 /**
@@ -128,8 +159,8 @@ void remove_job(int pid) {
  * @brief Print the list of jobs
 */
 void print_jobs() {
-    for (int i = 0; i < job_count; i++) {
-        
+    int i = 0;
+    while (i < job_count){
         char *job_id = malloc(number_length(jobs[i].id) + 2 + 1);   // 2 brackets + null terminator
         snprintf(job_id, number_length(jobs[i].id) + 2 + 1, "[%d]", jobs[i].id);
         color_switch(&job_id, red);
@@ -137,8 +168,11 @@ void print_jobs() {
         printf("%s  %d  %s  %s\n", job_id, jobs[i].pid, status_to_string(get_status(jobs[i].pid)), jobs[i].cmd);
         
         free(job_id);
-        if(get_status(jobs[i].pid) == 0){
-            remove_job(jobs[i].pid);
+        if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
+            remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
+        }
+        else{   // If the job is still running, increment i
+            i++;
         }
     }
 }
