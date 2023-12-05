@@ -79,6 +79,15 @@ int len (char ** str) {
     return i;
 }
 
+int len_triple(char ***str){
+    int i = 0;
+    while (str[i] != NULL) {
+        i++;
+    }
+    return i;
+
+}
+
 char** get_tab_of_commande (char* commande){
     char *copy1 = strdup(commande);
     if (!copy1) exit(1);

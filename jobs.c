@@ -5,10 +5,12 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <signal.h>
+
 #include "jobs.h"
 #include "utils.h"
 #include "colors.h"
 #include "pipe.h"
+#include "redirection.h"
 
 typedef struct {
     int pid;
@@ -19,6 +21,41 @@ typedef struct {
 Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
+
+char*** split_commands_for_jobs(char **commande_args) {
+    char ***commands = malloc(MAX_COMMANDS * sizeof(char **));
+    int command_count = 0;
+    commands[command_count] = malloc(MAX_ARGS * sizeof(char *));
+    int arg_count = 0;
+
+    for (int i = 0; commande_args[i] != NULL; i++) {
+
+        printf("%s\n", commande_args[i]);
+        
+        if (strcmp(commande_args[i], "&") == 0) {
+            commands[command_count][arg_count] = commande_args[i]; // Include the "&" in the command
+            arg_count++;
+            commands[command_count][arg_count] = NULL; // End the current command
+            command_count++;
+            commands[command_count] = malloc(MAX_ARGS * sizeof(char *)); // Start a new command
+            arg_count = 0;
+        } else {
+            commands[command_count][arg_count] = commande_args[i];
+            arg_count++;
+        }
+    }
+    commands[command_count][arg_count] = NULL; // End the last command
+    commands[command_count + 1] = NULL; // End the list of commands
+
+    return commands;
+}
+
+void free_splited_commands(char ***commands) {
+    for (int i = 0; commands[i] != NULL; i++) {
+        free(commands[i]);
+    }
+    free(commands);
+}
 
 int get_pid_by_id(int id) {
     for (int i = 0; i < job_count; i++) {
@@ -44,7 +81,7 @@ int get_status(int pid) {
         return status;
     } else {
         // An error occurred
-        return -2;
+        return status;
     }
 }
 
@@ -64,6 +101,14 @@ const char *status_to_string(int status) {
     }
 }
 
+void print_job(Job job) {
+    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
+    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
+    color_switch(&job_id, red);
+    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(get_status(job.pid)), job.cmd);
+    free(job_id);
+}
+
 /**
  * @brief Set the first free id in the list of jobs
 */
@@ -78,7 +123,7 @@ int set_first_free_id() {
     return -1;
 }
 
-int execute_command(char **commande_args, bool is_background, bool has_pipe) {
+int add_job(char **commande_args, bool is_background, bool has_pipe) {
     jobs[job_count].cmd[0] = '\0'; // Start with an empty string
 
     for (int i = 0; commande_args[i] != NULL; i++) {
@@ -90,6 +135,42 @@ int execute_command(char **commande_args, bool is_background, bool has_pipe) {
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
+        int descripteur_sortie_standart = -1;
+        int descripteur_sortie_erreur = -1;
+
+        int copie_sortie_standart = dup(STDOUT_FILENO);
+        int copie_sortie_erreur = dup(STDERR_FILENO);
+        /*
+        * Mise en place des descripteurs en cas de redirections
+        * On sait que la dernière redirection a la priorité, donc on a juste besoin de 2 descripteur, le premier pour la redirection pour la sortie standart
+        * et le deuxième pour la redirection dans la sortie erreur
+        * 
+        * Dans cette condition, si il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
+        * avec la suite du code
+        */
+        if(isRedirection(commande_args) != -1){
+            int *fd = getDescriptorOfRedirection(commande_args);
+            if(fd[0] != -1){
+                descripteur_sortie_standart = fd[0];
+            }
+            if(fd[1] != -1){
+                descripteur_sortie_erreur = fd[1];
+            }
+
+            if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
+                free(fd);
+                return 1;
+            }
+            if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
+                free(fd);
+                return 1;
+            }
+
+            //On récupère la commande cad : comm > fic, 
+            commande_args = getCommandeOfRedirection(commande_args);
+            free(fd);
+        }
+
         if (is_background) { // If the command is run in the background
             setpgid(0, 0); // Set the process group ID to the process ID
         }
@@ -105,35 +186,37 @@ int execute_command(char **commande_args, bool is_background, bool has_pipe) {
             fprintf(stderr,"Error: command not found.\n");
             exit(0);
         }
+
+        /*
+        *Si les descripteurs sont difféérents de -1 alors c'est qu'il y a un fichier qui est ouvert
+        */
+        if(descripteur_sortie_erreur >0){
+            close(descripteur_sortie_erreur);
+            dup2(copie_sortie_erreur,2);
+        }
+        if(descripteur_sortie_standart >0){
+            close(descripteur_sortie_standart);
+            dup2(copie_sortie_standart,1);
+        }
     }
     else if (pid < 0) { // Error
         fprintf(stderr,"Error: fork failed.\n");
         exit(0);
     }
     else {  // Parent process
-        jobs[job_count].pid = pid;
-        jobs[job_count].id = set_first_free_id();
-
         if (!is_background) { // If the command is not run in the background
             int status;
             waitpid(pid, &status, 0); // Wait for the child process to finish
+            return status;
         }
-
-        printf("[%d] %d\n", jobs[job_count].id, jobs[job_count].pid);
-        job_count++;
+        else{
+            jobs[job_count].pid = pid;
+            jobs[job_count].id = set_first_free_id();
+            printf("[%d] %d\n", jobs[job_count].id, jobs[job_count].pid);
+            job_count++;
+        }        
     }
     return 0;
-}
-
-/**
- * @brief Add a job to the list of jobs
- * @param pid The pid of the job
- * @param cmd The command of the job
- * @param status The status of the job
-*/
-int add_job(char **commande_args, bool has_pipe) {
-    return execute_command(commande_args, true, has_pipe);
-
 }
 
 /**
@@ -161,14 +244,24 @@ void remove_job(int pid) {
 void print_jobs() {
     int i = 0;
     while (i < job_count){
-        char *job_id = malloc(number_length(jobs[i].id) + 2 + 1);   // 2 brackets + null terminator
-        snprintf(job_id, number_length(jobs[i].id) + 2 + 1, "[%d]", jobs[i].id);
-        color_switch(&job_id, red);
-
-        printf("%s  %d  %s  %s\n", job_id, jobs[i].pid, status_to_string(get_status(jobs[i].pid)), jobs[i].cmd);
-        
-        free(job_id);
+        print_job(jobs[i]);
         if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
+            remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
+        }
+        else{   // If the job is still running, increment i
+            i++;
+        }
+    }
+}
+
+/**
+ * @brief Verify if any jobs are done and print them, then remove them from the list
+*/
+void verify_done_jobs() {
+    int i = 0;
+    while (i < job_count){
+        if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, print it and remove it from the list
+            print_job(jobs[i]);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
         else{   // If the job is still running, increment i
