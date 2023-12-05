@@ -8,7 +8,8 @@
 #define SORTIE_ERREUR_FORCE "2>|"
 #define SORTIE_ERREUR_SANS_ECRASEMENT "2>>"
 
-
+int isRedirectionErreur(char **commande);
+int isRedirectionStandart(char **commande);
 int numberOfRedirection(char **commande);
 int isRedirection(char **commande);
 char ** getCommandeOfRedirection (char **commande);

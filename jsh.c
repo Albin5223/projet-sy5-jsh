@@ -236,6 +236,16 @@ int main(int argc, char const *argv[]){
             if(fd[1] != -1){
                 descripteur_sortie_erreur = fd[1];
             }
+            if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
+                last_return_code = 1;
+                free(fd);
+                continue;
+            }
+            if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
+                last_return_code = 1;
+                free(fd);
+                continue;
+            }
             //On récupère la commande cad : comm > fic, 
             commande_args = getCommandeOfRedirection(commande_args);
             free(fd);
@@ -243,9 +253,17 @@ int main(int argc, char const *argv[]){
 
         if(strcmp(commande_args[0],"exit") == 0){
             if(commande_args[1] != NULL){
+                free(commande_args);
+                free(input);
+                free(precedent);
+                clear_history();
                 exit(atoi(commande_args[1]));
             }
             else{
+                free(commande_args);
+                free(input);
+                free(precedent);
+                clear_history();
                 exit(last_return_code);
             }
         }
@@ -329,9 +347,5 @@ int main(int argc, char const *argv[]){
         free(commande_args);
         free(input);
     }
-    free(precedent);
-    clear_history();
-    
-    
     return 0;
 }

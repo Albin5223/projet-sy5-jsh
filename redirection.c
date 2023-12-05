@@ -41,6 +41,50 @@ int numberOfRedirection(char **commande){
     return number;
 }
 
+int isRedirectionStandart(char **commande){
+    int i = 0;
+    while(1){
+        char *tmp = commande[i];
+        if (tmp == NULL){
+            return -1;
+        }
+        if(strcmp(tmp,SIMPLE)==0){
+            return i;
+        }
+        if(strcmp(tmp,FORCE)==0){
+            return i;
+        }
+        if(strcmp(tmp,SANS_ECRASEMENT)==0){
+            return i;
+        }
+        i++;
+    }
+
+    return -1;
+}
+
+int isRedirectionErreur(char **commande){
+    int i = 0;
+    while(1){
+        char *tmp = commande[i];
+        if (tmp == NULL){
+            return -1;
+        }
+        if(strcmp(tmp,SORTIE_ERREUR)==0){
+            return i;
+        }
+        if(strcmp(tmp,SORTIE_ERREUR_FORCE)==0){
+            return i;
+        }
+        if(strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
+            return i;
+        }
+        i++;
+    }
+
+    return -1;
+}
+
 int isRedirection(char **commande){
     int i = 0;
     while(1){
