@@ -109,14 +109,6 @@ const char *status_to_string(int status) {
     }
 }
 
-void print_job(Job job) {
-    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
-    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
-    color_switch(&job_id, red);
-    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(update_status(job.pid)), job.cmd);
-    free(job_id);
-}
-
 void print_job_old_status(Job job, int old_status){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
@@ -125,10 +117,15 @@ void print_job_old_status(Job job, int old_status){
     free(job_id);
 }
 
+void print_job(Job job) {
+    print_job_old_status(job, update_status(job.pid));
+}
+
 /**
  * @brief Set the first free id in the list of jobs
 */
 int set_first_free_id() {
+    id_taken[0] = true;
     for (int i = 0; i < MAX_JOBS; i++) {
         if (!id_taken[i]) {
             id_taken[i] = true;
@@ -151,6 +148,10 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
+        if (is_background) { // If the command is run in the background
+            setpgid(0, 0); // Set the process group ID to the process ID
+        }
+
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
 
@@ -187,9 +188,6 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             free(fd);
         }
 
-        if (is_background) { // If the command is run in the background
-            setpgid(0, 0); // Set the process group ID to the process ID
-        }
         if (has_pipe) { // If the command has a pipe, we need to do the pipe
             int n = nbPipes(commande_args);
             char ** tab_no_pipes = noPipe(commande_args, n);
@@ -228,7 +226,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         else{
             jobs[job_count].pid = pid;
             jobs[job_count].id = set_first_free_id();
-            printf("[%d] %d\n", jobs[job_count].id, jobs[job_count].pid);
+            print_job(jobs[job_count]);
             job_count++;
         }        
     }
