@@ -165,7 +165,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         * Dans cette condition, si il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
         * avec la suite du code
         */
-        if(isRedirection(commande_args) != -1){
+        if(isRedirection(commande_args) != -1 && !has_pipe){
             int *fd = getDescriptorOfRedirection(commande_args);
             if(fd[0] != -1){
                 descripteur_sortie_standart = fd[0];
