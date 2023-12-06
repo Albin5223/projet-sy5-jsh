@@ -139,11 +139,11 @@ int main(int argc, char const *argv[]){
     rl_outstream = stderr;
 
     while(1){
-        verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
 
         char *path = path_shell("$ ", green, blue);
         
         input = readline(path);
+        verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
         add_history(input);
         if(input == NULL){
             exit(last_return_code);

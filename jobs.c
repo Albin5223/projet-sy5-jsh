@@ -78,7 +78,7 @@ int get_pid_by_id(int id) {
  * @brief Return the status of the job with the given pid
  * @param pid The pid of the job
 */
-int get_status(int pid) {
+int update_status(int pid) {
     int status;
     int result = waitpid(pid, &status, WNOHANG);
     if (result == 0) {
@@ -100,6 +100,8 @@ const char *status_to_string(int status) {
         return "Done";
     } else if (WIFSTOPPED(status)) {
         return "Stopped";
+    } else if (WIFCONTINUED(status)) {
+        return "Continued";  
     } else if (WIFSIGNALED(status)) {
         return "Terminated by signal";
     } else {
@@ -111,7 +113,7 @@ void print_job(Job job) {
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
-    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(get_status(job.pid)), job.cmd);
+    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(update_status(job.pid)), job.cmd);
     free(job_id);
 }
 
@@ -272,7 +274,7 @@ int print_jobs() {
     int i = 0;
     while (i < job_count){
         print_job(jobs[i]);
-        if(get_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
+        if(update_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
             if(remove_job(jobs[i].pid) != 0){
                 return 1;
             }
@@ -290,7 +292,7 @@ int print_jobs() {
 void verify_done_jobs() {
     int i = 0;
     while (i < job_count){
-        int old_status = get_status(jobs[i].pid);
+        int old_status = update_status(jobs[i].pid);
         if(old_status != -1){  // If the job is not running anymore, print it and remove it from the list
             print_job_old_status(jobs[i],old_status);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
