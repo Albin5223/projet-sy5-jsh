@@ -189,11 +189,12 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         }
 
         if (has_pipe) { // If the command has a pipe, we need to do the pipe
-            int n = nbPipes(commande_args);
-            char ** tab_no_pipes = noPipe(commande_args, n);
-            int ret = doPipe(tab_no_pipes, n + 1);
-            free_tab(tab_no_pipes);
-            return ret;
+            //int n = nbPipes(commande_args);
+            //char ** tab_no_pipes = noPipe(commande_args, n);
+            //int ret = doPipe(tab_no_pipes, n + 1);
+            //free_tab(tab_no_pipes);
+            int ret = makePipe(commande_args);
+            exit(ret);
         }
         else{   // If the command does not have a pipe, we can just execute it
             execvp(commande_args[0], commande_args);

@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 
 #include "pipe.h"
-#include "utils.h"
+#include "utils.h" 
 
 int nbPipes(char **commande){
     int i = 0;
@@ -123,4 +123,102 @@ int doPipe(char **commande_args, int nb){
     }
 
     return ret;
+}
+
+
+char **getCommandOfPipe(char **commande_args){
+    int size = 0;
+    while(1){
+        char *tmp = commande_args[size];
+        if (tmp == NULL){
+            break;
+        }
+        if(strcmp(tmp,PIPE) == 0){
+            break;
+        }
+        size++;
+    }
+    char **tab = malloc(sizeof(char*) * (size + 1));
+
+    for(int i = 0; i < size; i++){
+        tab[i] = commande_args[i];
+    }
+
+    tab[size] = NULL;
+    return tab;
+}
+
+int makePipe(char **commande_args){
+    int size = nbPipes(commande_args)+1;
+    char ***tab = malloc(sizeof(char**) * size);
+
+    for(int i = 0; i < size; i++){
+        tab[i] = getCommandOfPipe(commande_args);
+        commande_args = commande_args + len(tab[i]) + 1; 
+    }
+
+    int fd[size-1][2];
+    for(int i = 0;i<size-1;i++){
+        if(pipe(fd[i]) == -1){
+            perror("pipe");
+            return 1;
+        }
+    }
+
+    pid_t pid = fork();
+    int pid2;
+    switch (pid){
+    case -1:
+        perror("fork");
+        break;
+    case 0 :
+        for(int i = 0;i<size-1;i++){
+            pid2 = fork();
+            switch (pid2){
+                case -1:
+                    perror("fork");
+                    break;
+                case 0:
+                    if(i == 0){
+                        dup2(fd[i][1], STDOUT_FILENO);
+                        for(int j = 0;j<size-1;j++){
+                            close(fd[j][0]);
+                            close(fd[j][1]);
+                        }
+                        execvp(tab[i][0], tab[i]);
+                        perror("execvp");
+                        exit(EXIT_FAILURE);
+                    }
+                    else{
+                        dup2(fd[i-1][0], STDIN_FILENO);
+                        dup2(fd[i][1], STDOUT_FILENO);
+                        for(int j = 0;j<size-1;j++){
+                            close(fd[j][0]);
+                            close(fd[j][1]);
+                        }
+                        execvp(tab[i][0], tab[i]);
+                        perror("execvp");
+                        exit(EXIT_FAILURE);
+                    }
+            }
+        }  
+    default:
+        dup2(fd[size-2][0], STDIN_FILENO);
+        for(int i = 0;i<size-1;i++){
+            close(fd[i][0]);
+            close(fd[i][1]);
+        }
+        execvp(tab[size-1][0], tab[size-1]);
+        perror("execvp");
+        exit(EXIT_FAILURE);
+        break;
+    }
+
+    // Libérer la mémoire allouée
+    for (int i = 0; i < size; i++) {
+        free(tab[i]);
+    }
+    free(tab);
+
+    return 0;
 }
