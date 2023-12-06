@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "pipe.h"
 #include "jobs.h"
+#include "kill.h"
 
 /**
  * Represents the maximum size of the path
@@ -186,6 +187,33 @@ int main(int argc, char const *argv[]){
         }
         else if(strcmp(commande_args[0],"jobs") == 0){
             last_return_code = print_jobs();
+        }
+        else if(strcmp(commande_args[0],"kill") == 0){
+            bool wrong_args = false;
+            if(len(commande_args) == 2){    // if we have command like "kill %1"
+                if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
+                    last_return_code = kill_id(atoi(commande_args[1]+1));   // We remove the first character of the string (the %) and we convert it to an int
+                }
+                else{
+                    wrong_args = true;
+                }
+            }
+            else if(len(commande_args) == 3){   // if we have command like "kill -9 %1"
+                if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
+                    last_return_code = send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
+                }
+                else{
+                    wrong_args = true;
+                }
+
+            }
+            else{
+                wrong_args = true;
+            }
+
+            if(wrong_args){
+                last_return_code = execute_commande_externe(commande_args);
+            }
         }
         else{
             last_return_code = execute_commande_externe(commande_args);

@@ -103,7 +103,7 @@ const char *status_to_string(int status) {
     } else if (WIFCONTINUED(status)) {
         return "Continued";  
     } else if (WIFSIGNALED(status)) {
-        return "Terminated by signal";
+        return "Killed";
     } else {
         return "Unknown";
     }
