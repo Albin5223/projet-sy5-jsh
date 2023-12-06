@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 /**
  * @brief Return the number of digits of the number n (including the signe)
@@ -79,15 +80,6 @@ int len (char ** str) {
     return i;
 }
 
-int len_triple(char ***str){
-    int i = 0;
-    while (str[i] != NULL) {
-        i++;
-    }
-    return i;
-
-}
-
 char** get_tab_of_commande (char* commande){
     char *copy1 = strdup(commande);
     if (!copy1) exit(1);
@@ -110,4 +102,20 @@ char** get_tab_of_commande (char* commande){
     commande_args[i] = NULL;
 
     return commande_args;
+}
+
+/**
+ * @brief return true if the string start with the char c then continue with digits
+ * @param str The string
+ * @param c The char
+*/
+bool start_with_char_then_digits(char *str, char c) {
+    if(str == NULL) return false;
+    int len = strlen(str);
+    if(len < 2) return false;
+    if(str[0] != c) return false;
+    for(int i = 1; i < len; i++) {
+        if(str[i] < '0' || str[i] > '9') return false;
+    }
+    return true;
 }
