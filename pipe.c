@@ -164,9 +164,10 @@ int makePipe(char **commande_args){
             return 1;
         }
     }
-
-    pid_t pid = fork();
     int pid2;
+    int val;
+    pid_t pid = fork();
+    
     switch (pid){
     case -1:
         perror("fork");
@@ -200,25 +201,33 @@ int makePipe(char **commande_args){
                         perror("execvp");
                         exit(EXIT_FAILURE);
                     }
+                default:
+                    wait(&val);
+                    if(val != 0){
+                        exit(EXIT_FAILURE);
+                    }
             }
         }  
     default:
-        dup2(fd[size-2][0], STDIN_FILENO);
-        for(int i = 0;i<size-1;i++){
-            close(fd[i][0]);
-            close(fd[i][1]);
+        wait(&val);
+        if(val != 0){
+            for (int i = 0; i < size; i++) {
+                free(tab[i]);
+            }
+            free(tab);
+            exit(EXIT_FAILURE);
         }
-        execvp(tab[size-1][0], tab[size-1]);
-        perror("execvp");
-        exit(EXIT_FAILURE);
-        break;
+        else{
+            dup2(fd[size-2][0], STDIN_FILENO);
+            for(int i = 0;i<size-1;i++){
+                close(fd[i][0]);
+                close(fd[i][1]);
+            }
+            execvp(tab[size-1][0], tab[size-1]);
+            perror("execvp");
+            exit(EXIT_FAILURE);
+            break;
+        }
     }
-
-    // Libérer la mémoire allouée
-    for (int i = 0; i < size; i++) {
-        free(tab[i]);
-    }
-    free(tab);
-
-    return 0;
+    return 5;
 }
