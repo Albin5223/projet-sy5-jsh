@@ -19,20 +19,45 @@ typedef struct {
 
 typedef struct {
     int pid;
-    char cmd[MAX_CMD_LEN];
+    char cmd[MAX_SUB_CMD_LEN];
     int id;
+    enum status status;
 } Job;
 
 Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
 
+const char *status_to_string(enum status status){
+    switch (status) {
+        case RUNNING:
+            return "Running";
+        case DONE:
+            return "Done";
+        case STOPPED:
+            return "Stopped";
+        case CONTINUED:
+            return "Continued";
+        case KILLED:
+            return "Killed";
+        case DETACHED:
+            return "Detached";
+        default:
+            return "Unknown";
+    }
+}
+
+/**
+ * @brief Split the given command into multiple subcommands, separated by the & character (for background execution, but subcommands do not contain the & character)
+ * @param commande_args The command to split
+ * @return An array of commands
+*/
 Command *split_commands_for_jobs(char **commande_args) {
     Command *commands = malloc(sizeof(Command) * MAX_COMMANDS);
     int i = 0;
     int j = 0;
     int k = 0;
-    commands[0].cmd = malloc(sizeof(char*) * MAX_ARGS);
+    commands[0].cmd = malloc(sizeof(char*) * MAX_SUBCOMMANDS);
     commands[0].is_background = false;
     while (1) {
         char *tmp = commande_args[i];
@@ -45,7 +70,7 @@ Command *split_commands_for_jobs(char **commande_args) {
             commands[j].is_background = true;
             j++;
             k = 0;
-            commands[j].cmd = malloc(sizeof(char*) * MAX_ARGS);
+            commands[j].cmd = malloc(sizeof(char*) * MAX_SUBCOMMANDS);
             commands[j].is_background = false;
         } else {
             commands[j].cmd[k] = tmp;
@@ -65,60 +90,73 @@ void free_splited_commands(char ***commands) {
     free(commands);
 }
 
-int get_pid_by_id(int id) {
-    for (int i = 0; i < job_count; i++) {
-        if (jobs[i].id == id) {
+int get_pid_by_id(int id){
+    for(int i = 0; i < job_count; i++){
+        if(jobs[i].id == id){
             return jobs[i].pid;
         }
     }
     return -1;
 }
 
+int get_position_with_pid(int pid){
+    for(int i = 0; i < job_count; i++){
+        if(jobs[i].pid == pid){
+            return i;
+        }
+    }
+    return -1;
+}
+
 /**
- * @brief Return the status of the job with the given pid
+ * @brief Update the status of the job with the given pid
  * @param pid The pid of the job
 */
-int update_status(int pid) {
+enum status update_status(int pid) {
     int status;
-    int result = waitpid(pid, &status, WNOHANG);
+    int result = waitpid(pid, &status, WNOHANG | WUNTRACED | WCONTINUED);
     if (result == 0) {
         // Child is still running
-        return -1;
+        if(jobs[get_position_with_pid(pid)].status == STOPPED){ // If the job was stopped, return stopped and do not update the status
+            return STOPPED; 
+        } 
+        else{   // Else, return running and update the status
+            jobs[get_position_with_pid(pid)].status = RUNNING;
+            return RUNNING;
+        }   
     }
     else {
         // Child is done
-        return status;
+        if (WIFEXITED(status)) {
+            jobs[get_position_with_pid(pid)].status = DONE;
+            return DONE;
+        }
+        else if (WIFSIGNALED(status)) {
+            jobs[get_position_with_pid(pid)].status = KILLED;
+            return KILLED;
+        }
+        else if (WIFSTOPPED(status)) {
+            jobs[get_position_with_pid(pid)].status = STOPPED;
+            return STOPPED;
+        }
+        else if (WIFCONTINUED(status)) {
+            jobs[get_position_with_pid(pid)].status = CONTINUED;
+            return CONTINUED;
+        }
+        else {
+            // TODO : handle DETACHED status
+            printf("Error: unknown status.\n");
+            return -1;
+        }
     }
 }
 
-const char *status_to_string(int status) {
-    if (status == -1) {
-        return "Running";
-    } else if (status == -2) {
-        return "Error";
-    } else if (WIFEXITED(status)) {
-        return "Done";
-    } else if (WIFSTOPPED(status)) {
-        return "Stopped";
-    } else if (WIFCONTINUED(status)) {
-        return "Continued";  
-    } else if (WIFSIGNALED(status)) {
-        return "Killed";
-    } else {
-        return "Unknown";
-    }
-}
-
-void print_job_old_status(Job job, int old_status){
+void print_job(Job job){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
-    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(old_status), job.cmd);
+    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
     free(job_id);
-}
-
-void print_job(Job job) {
-    print_job_old_status(job, update_status(job.pid));
 }
 
 /**
@@ -137,15 +175,6 @@ int set_first_free_id() {
 }
 
 int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
-    jobs[job_count].cmd[0] = '\0'; // Start with an empty string
-
-    for (int i = 0; commande_args[i] != NULL; i++) {
-        if (i > 0) {
-            strcat(jobs[job_count].cmd, " "); // Add a space before each argument after the first
-        }
-        strcat(jobs[job_count].cmd, commande_args[i]);
-    }
-
     pid_t pid = fork();
     if (pid == 0) { // Child process
         if (is_background) { // If the command is run in the background
@@ -225,10 +254,23 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             return status;
         }
         else{
-            jobs[job_count].pid = pid;
-            jobs[job_count].id = set_first_free_id();
-            print_job(jobs[job_count]);
+            jobs[job_count].cmd[0] = '\0'; // Start with an empty string
+            for (int i = 0; commande_args[i] != NULL; i++) {
+                if (i > 0) {
+                    strcat(jobs[job_count].cmd, " "); // Add a space before each argument after the first
+                }
+                strcat(jobs[job_count].cmd, commande_args[i]);
+            }
+
             job_count++;
+
+            jobs[job_count-1].pid = pid;
+            jobs[job_count-1].id = set_first_free_id();
+            if(update_status(pid) == -1){
+                fprintf(stderr,"Error: job [%d] not found.\n",jobs[job_count].id);
+                return 1;
+            }
+            print_job(jobs[job_count-1]);
         }        
     }
     return 0;
@@ -254,6 +296,10 @@ int remove_job(int pid) {
     for (int i = 0; i < job_count; i++) {
         if (jobs[i].pid == pid) {
             id_taken[jobs[i].id] = false;
+            jobs[i].cmd[0] = '\0';
+            jobs[i].pid = -1;
+            jobs[i].id = -1;
+            jobs[i].status = -1;
             // Shift all elements down to fill the gap
             for (int j = i; j < job_count - 1; j++) {
                 jobs[j] = jobs[j + 1];
@@ -269,11 +315,16 @@ int remove_job(int pid) {
 /**
  * @brief Print the list of jobs
 */
-int print_jobs() {
+int print_all_jobs() {
     int i = 0;
     while (i < job_count){
+        if(update_status(jobs[i].pid) == -1){
+            fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
+            return -1;
+        }
         print_job(jobs[i]);
-        if(update_status(jobs[i].pid) != -1){  // If the job is not running anymore, remove it from the list
+        enum status status = jobs[i].status;
+        if(status == DONE || status == KILLED){  // If the job has exited, or killed, remove it from the list
             if(remove_job(jobs[i].pid) != 0){
                 return 1;
             }
@@ -291,9 +342,13 @@ int print_jobs() {
 void verify_done_jobs() {
     int i = 0;
     while (i < job_count){
-        int old_status = update_status(jobs[i].pid);
-        if(old_status != -1){  // If the job is not running anymore, print it and remove it from the list
-            print_job_old_status(jobs[i],old_status);
+        if(update_status(jobs[i].pid) == -1){
+            fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
+            return;
+        }
+        enum status status = jobs[i].status;
+        if(status == DONE || status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
+            print_job(jobs[i]);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
         else{   // If the job is still running, increment i

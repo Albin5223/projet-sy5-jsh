@@ -194,7 +194,7 @@ int main(int argc, char const *argv[]){
             last_return_code = execute_cd(commande_args, &precedent);
         }
         else if(strcmp(commande_args[0],"jobs") == 0){
-            last_return_code = print_jobs();
+            last_return_code = print_all_jobs();
         }
         else if(strcmp(commande_args[0],"kill") == 0){
             bool wrong_args = false;
