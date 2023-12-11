@@ -159,6 +159,22 @@ void print_job(Job job){
     free(job_id);
 }
 
+void print_job_with_AND(Job job){
+    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
+    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
+    color_switch(&job_id, red);
+    printf("%s  %d  %s  %s %s\n", job_id, job.pid, status_to_string(job.status), job.cmd, "&");
+    free(job_id);
+}
+
+void print_pid_job(Job job){
+    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
+    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
+    color_switch(&job_id, red);
+    printf("%s  %d\n", job_id, job.pid);
+    free(job_id);
+}
+
 /**
  * @brief Set the first free id in the list of jobs
 */
@@ -270,7 +286,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
                 fprintf(stderr,"Error: job [%d] not found.\n",jobs[job_count].id);
                 return 1;
             }
-            print_job(jobs[job_count-1]);
+            print_pid_job(jobs[job_count-1]);
         }        
     }
     return 0;
@@ -322,7 +338,7 @@ int print_all_jobs() {
             fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
             return -1;
         }
-        print_job(jobs[i]);
+        print_job_with_AND(jobs[i]);
         enum status status = jobs[i].status;
         if(status == DONE || status == KILLED){  // If the job has exited, or killed, remove it from the list
             if(remove_job(jobs[i].pid) != 0){
