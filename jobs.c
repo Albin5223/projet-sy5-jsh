@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "jobs.h"
 #include "utils.h"
@@ -53,7 +54,25 @@ const char *status_to_string(enum status status){
  * @return An array of commands
 */
 Command *split_commands_for_jobs(char **commande_args) {
-    Command *commands = malloc(sizeof(Command) * MAX_COMMANDS);
+    // Count the number of "&" symbols
+    int command_count = 0;  // Start from 1 to account for the first command
+    bool last_was_ampersand = false;
+    for (int i = 0; commande_args[i] != NULL; i++) {
+        if (strcmp(commande_args[i], "&") == 0) {
+            command_count++;
+            last_was_ampersand = true;
+        } else {
+            last_was_ampersand = false;
+        }
+    }
+
+    // If the last command wasn't followed by an "&", increment the command_count
+    if (!last_was_ampersand) {
+        command_count++;
+    }
+
+    // Allocate memory for commands based on the count
+    Command *commands = malloc(sizeof(Command) * (command_count + 1));  // +1 for the NULL terminator
     int i = 0;
     int j = 0;
     int k = 0;
@@ -72,13 +91,17 @@ Command *split_commands_for_jobs(char **commande_args) {
             k = 0;
             commands[j].cmd = malloc(sizeof(char*) * MAX_SUBCOMMANDS);
             commands[j].is_background = false;
+            commands[j].cmd[0] = NULL;  // Initialize the cmd of the new command to NULL
         } else {
             commands[j].cmd[k] = tmp;
             k++;
         }
         i++;
     }
-    commands[j+1].cmd = NULL;
+    if (k != 0) {  // Only set cmd to NULL if a new command was started
+        commands[j+1].cmd = malloc(sizeof(char*));  // Allocate memory for commands[j+1].cmd
+        commands[j+1].cmd[0] = NULL;
+    }
     return commands;
 }
 
@@ -242,9 +265,9 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             exit(ret);
         }
         else{   // If the command does not have a pipe, we can just execute it
-            int e = execvp(commande_args[0], commande_args);
-            fprintf(stderr,"Error: command not found.\n");
-            exit(e);    // If execvp returns, there was an error
+            execvp(commande_args[0], commande_args);
+            fprintf(stderr,"Error: command not found. errno = %d\n", errno);
+            exit(1);    // If execvp returns, there was an error
         }
 
         /*
@@ -261,7 +284,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
     }
     else if (pid < 0) { // Error
         fprintf(stderr,"Error: fork failed.\n");
-        exit(0);
+        exit(1);
     }
     else {  // Parent process
         if (!is_background) { // If the command is not run in the background
@@ -300,7 +323,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
 int add_job(char **commande_args, bool has_pipe) {
     Command *commands = split_commands_for_jobs(commande_args);
-    for (int i = 0; commands[i].cmd != NULL; i++) {
+    for (int i = 0; commands[i].cmd[0] != NULL; i++) {
         int status = add_job_command(commands[i].cmd, commands[i].is_background, has_pipe);
         if (status != 0) {
             return status;
