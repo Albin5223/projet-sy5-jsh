@@ -266,7 +266,8 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         }
         else{   // If the command does not have a pipe, we can just execute it
             execvp(commande_args[0], commande_args);
-            fprintf(stderr,"Error: command not found. errno = %d\n", errno);
+            const char *error = strerror(errno);
+            fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
             exit(1);    // If execvp returns, there was an error
         }
 
