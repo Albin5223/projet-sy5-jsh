@@ -242,9 +242,9 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             exit(ret);
         }
         else{   // If the command does not have a pipe, we can just execute it
-            execvp(commande_args[0], commande_args);
+            int e = execvp(commande_args[0], commande_args);
             fprintf(stderr,"Error: command not found.\n");
-            exit(0);
+            exit(e);    // If execvp returns, there was an error
         }
 
         /*
@@ -267,7 +267,13 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         if (!is_background) { // If the command is not run in the background
             int status;
             waitpid(pid, &status, 0); // Wait for the child process to finish
-            return status;
+            if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            }
+            else {
+                fprintf(stderr,"Error: child process exited abnormally.\n");
+                return 1;
+            }
         }
         else{
             jobs[job_count].cmd[0] = '\0'; // Start with an empty string

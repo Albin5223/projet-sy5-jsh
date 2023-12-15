@@ -9,5 +9,6 @@ int len (char ** str);
 void free_tab(char ** tab);
 char** get_tab_of_commande (char* commande);
 bool start_with_char_then_digits(char *str, char c);
+int is_number(const char *str);
 
 #endif

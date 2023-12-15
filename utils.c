@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 /**
  * @brief Return the number of digits of the number n (including the signe)
@@ -116,6 +117,19 @@ bool start_with_char_then_digits(char *str, char c) {
     if(str[0] != c) return false;
     for(int i = 1; i < len; i++) {
         if(str[i] < '0' || str[i] > '9') return false;
+    }
+    return true;
+}
+
+bool is_number(const char *str) {
+    if (*str == '-') {
+        str++;
+    }
+    while(*str) {
+        if(!isdigit(*str)) {
+            return false;
+        }
+        str++;
     }
     return true;
 }

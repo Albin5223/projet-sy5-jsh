@@ -164,19 +164,28 @@ int main(int argc, char const *argv[]){
 
         if(strcmp(commande_args[0],"exit") == 0){
             int numberOfJobs = getNbJobs();
-            if(numberOfJobs != 0){
+            if(numberOfJobs != 0){  // If there are jobs running, we print an error message
                 printf("Il y a %d jobs en cours d'execution\n",numberOfJobs);
                 last_return_code = 1;
             }
             else{
-                if(commande_args[1] != NULL){
-                free(commande_args);
-                free(input);
-                free(precedent);
-                clear_history();
-                exit(atoi(commande_args[1]));
+                if(len(commande_args) > 2){ // If there are more than 2 arguments, we print an error message
+                    printf("Erreur: exit prend un seul argument\n");
+                    last_return_code = 1;
                 }
-                else{
+                else if(len(commande_args) == 2 && !is_number(commande_args[1])){   // If there is one argument and it's not a number, we print an error message
+                    printf("Erreur: argument de exit non valide\n");
+                    last_return_code = 1;
+                }
+                else if(len(commande_args) == 2){   // If there is one argument and it's a number, we exit with the return code
+                    last_return_code = atoi(commande_args[1]);
+                    free(commande_args);
+                    free(input);
+                    free(precedent);
+                    clear_history();
+                    exit(last_return_code);
+                }
+                else{   // If there is no argument, we exit with the return code
                     free(commande_args);
                     free(input);
                     free(precedent);
