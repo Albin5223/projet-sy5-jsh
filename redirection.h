@@ -4,6 +4,7 @@
 #define SIMPLE ">"
 #define FORCE ">|"
 #define SANS_ECRASEMENT ">>"
+#define ENTREE "<"
 #define SORTIE_ERREUR "2>"
 #define SORTIE_ERREUR_FORCE "2>|"
 #define SORTIE_ERREUR_SANS_ECRASEMENT "2>>"

@@ -8,13 +8,16 @@
 #include "redirection.h"
 #include "utils.h"
 
+/**
+ * @brief Retourne le nombre de redirection dans la commande
+*/
 int numberOfRedirection(char **commande){
     int i = 0;
     int number = 0;
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            number++;
+            number++; // return number;
         }
         if(strcmp(tmp,SIMPLE)==0){
             number++;        
@@ -32,6 +35,9 @@ int numberOfRedirection(char **commande){
             number++;        
         }
         if(strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
+            number++;
+        }
+        if(strcmp(tmp,ENTREE)==0){
             number++;
         }
         
@@ -41,12 +47,15 @@ int numberOfRedirection(char **commande){
     return number;
 }
 
+/**
+ * @brief Retourne si la commande contient une redirection standard, si oui retourne l'index de la redirection
+*/
 int isRedirectionStandart(char **commande){
     int i = 0;
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            return -1;
+            return -1;  // break;
         }
         if(strcmp(tmp,SIMPLE)==0){
             return i;
@@ -57,18 +66,24 @@ int isRedirectionStandart(char **commande){
         if(strcmp(tmp,SANS_ECRASEMENT)==0){
             return i;
         }
+        if(strcmp(tmp,ENTREE)==0){
+            return i;
+        }
         i++;
     }
 
     return -1;
 }
 
+/**
+ * @brief Retourne si la commande est une redirection d'erreur, si oui retourne l'index de la redirection
+*/
 int isRedirectionErreur(char **commande){
     int i = 0;
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            return -1;
+            return -1;  // break;
         }
         if(strcmp(tmp,SORTIE_ERREUR)==0){
             return i;
@@ -85,12 +100,15 @@ int isRedirectionErreur(char **commande){
     return -1;
 }
 
+/**
+ * @brief Retourne si la commande contient une redirection, si oui retourne l'index de la redirection
+*/
 int isRedirection(char **commande){
     int i = 0;
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            return -1;
+            return -1; // break;
         }
         if(strcmp(tmp,SIMPLE)==0){
             return i;
@@ -110,21 +128,27 @@ int isRedirection(char **commande){
         if(strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
             return i;
         }
+        if(strcmp(tmp,ENTREE)==0){
+            return i;
+        }
         i++;
     }
 
     return -1;
 }
 
+/**
+ * @brief Retourne la commande avec les redirections mais s'arrête à la redirection
+*/
 char ** getCommandeOfRedirection (char **commande){
     int size = isRedirection(commande);
     char **newCommande= malloc(sizeof(char*) * (size + 1));
 
-    for(unsigned i = 0;i<size;i++){
+    for(unsigned i = 0; i < size; i++){
         newCommande[i] = commande[i];
     }
 
-    newCommande[size]=NULL;
+    newCommande[size] = NULL;
 
     free(commande);
     return newCommande;
@@ -145,18 +169,18 @@ int* getDescriptorOfRedirection(char **commande){
     int i = 0;
 
     /*
-    *On recupere le dernier fichier de redirection pour la sortie standard et la sortie erreur
+    * On recupere le dernier fichier de redirection pour la sortie standard et la sortie erreur
     */
     while(1){
         char *tmp = commande[i];
         if(tmp == NULL){
             break;
         }
-        if(strcmp(tmp,SIMPLE)==0||strcmp(tmp,FORCE)==0||strcmp(tmp,SANS_ECRASEMENT)==0){
+        if(strcmp(tmp,SIMPLE) == 0 || strcmp(tmp,FORCE) == 0 || strcmp(tmp,SANS_ECRASEMENT) == 0 || strcmp(tmp,ENTREE) == 0){
             standard = commande[i+1];
             index_std = i;
         }
-        if(strcmp(tmp,SORTIE_ERREUR)==0||strcmp(tmp,SORTIE_ERREUR_FORCE)==0||strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
+        if(strcmp(tmp,SORTIE_ERREUR) == 0 || strcmp(tmp,SORTIE_ERREUR_FORCE) == 0 || strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT) == 0){
             erreur = commande[i+1];
             index_err = i;
         }
@@ -184,20 +208,20 @@ int* getDescriptorOfRedirection(char **commande){
         if(strcmp(commande[index_std],SIMPLE)==0){
             fd[0] = open(standard,O_WRONLY|O_CREAT|O_EXCL,0666);
         }
-        else{
-            if(strcmp(commande[index_std],FORCE)==0){
-                fd[0] = open(standard,O_WRONLY|O_CREAT|O_TRUNC,0666);
-            }
-            else{
-                fd[0] = open(standard,O_WRONLY|O_CREAT|O_APPEND,0666);
-            }
+        else if(strcmp(commande[index_std],FORCE)==0){
+            fd[0] = open(standard,O_WRONLY|O_CREAT|O_TRUNC,0666);
+        }
+        else if(strcmp(commande[index_std],SANS_ECRASEMENT)==0){
+            fd[0] = open(standard,O_WRONLY|O_CREAT|O_APPEND,0666);
+        }
+        else{ //ENTREE
+            fd[0] = open(standard,O_RDONLY,0666);
         }
     }
 
-    
 
     /*
-    *On redirige la sortie standard 1 vers fd[0] si il est superieur a 0
+    * On redirige la sortie standard 1 vers fd[0] si il est superieur a 0
     * On redirige la sortie erreur 2 vers fd[1] si il est superieur a 0
     */
 
