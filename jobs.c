@@ -222,9 +222,12 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
+        int descripteur_entree = -1; 
 
         int copie_sortie_standart = dup(STDOUT_FILENO);
         int copie_sortie_erreur = dup(STDERR_FILENO);
+        int copie_entree = dup(STDIN_FILENO);
+        
         /*
         * Mise en place des descripteurs en cas de redirections
         * On sait que la dernière redirection a la priorité, donc on a juste besoin de 2 descripteur, le premier pour la redirection pour la sortie standart
@@ -233,6 +236,16 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         * Dans cette condition, si il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
         * avec la suite du code
         */
+       if(isRedirectionEntree(commande_args)!= -1 && !has_pipe){
+            descripteur_entree = getFichierEntree(commande_args);
+            if(descripteur_entree == -1){
+                fprintf(stderr,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));
+                return 1;
+            }
+            dup2(descripteur_entree,0);
+            commande_args = getCommandeOfRedirection(commande_args);
+        }
+
         if(isRedirection(commande_args) != -1 && !has_pipe){
             int *fd = getDescriptorOfRedirection(commande_args);
             if(fd[0] != -1){
@@ -268,6 +281,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             execvp(commande_args[0], commande_args);
             const char *error = strerror(errno);
             fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
+            //free_tab(commande_args);
             exit(1);    // If execvp returns, there was an error
         }
 
@@ -281,6 +295,10 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         if(descripteur_sortie_standart >0){
             close(descripteur_sortie_standart);
             dup2(copie_sortie_standart,1);
+        }
+        if(descripteur_entree >0){
+            close(descripteur_entree);
+            dup2(copie_entree,0);
         }
     }
     else if (pid < 0) { // Error
@@ -327,10 +345,25 @@ int add_job(char **commande_args, bool has_pipe) {
     for (int i = 0; commands[i].cmd[0] != NULL; i++) {
         int status = add_job_command(commands[i].cmd, commands[i].is_background, has_pipe);
         if (status != 0) {
+            int j = 0;
+            for(int i = 0; commands[i].cmd[0] != NULL; i++){
+                free(commands[i].cmd);
+                j++;
+            }
+            free(commands[j].cmd);
+            free(commands);
             return status;
         }
     }
+
+    int j = 0;
+    for(int i = 0; commands[i].cmd[0] != NULL; i++){
+        free(commands[i].cmd);
+        j++;
+    }
+    free(commands[j].cmd);
     free(commands);
+
     return 0;
 }
 

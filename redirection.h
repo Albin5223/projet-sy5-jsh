@@ -11,6 +11,8 @@
 
 int isRedirectionErreur(char **commande);
 int isRedirectionStandart(char **commande);
+int isRedirectionEntree(char **commande);
+int getFichierEntree(char **commande);
 int numberOfRedirection(char **commande);
 int isRedirection(char **commande);
 char ** getCommandeOfRedirection (char **commande);

@@ -47,6 +47,32 @@ int numberOfRedirection(char **commande){
     return number;
 }
 
+int isRedirectionEntree(char **commande){
+    int i = 0;
+    while(1){
+        char *tmp = commande[i];
+        if (tmp == NULL){
+            return -1;  // break;
+        }
+        if(strcmp(tmp,ENTREE)==0){
+            return i;
+        }
+        i++;
+    }
+    return -1;
+}
+
+int getFichierEntree(char **commande){
+    int index = isRedirectionEntree(commande);
+    if(index == -1){
+        return -1;
+    }
+    char * r = commande[index+1];
+
+    int fd = open(r,O_RDONLY);
+    return fd;
+}
+
 /**
  * @brief Retourne si la commande contient une redirection standard, si oui retourne l'index de la redirection
 */
@@ -64,9 +90,6 @@ int isRedirectionStandart(char **commande){
             return i;
         }
         if(strcmp(tmp,SANS_ECRASEMENT)==0){
-            return i;
-        }
-        if(strcmp(tmp,ENTREE)==0){
             return i;
         }
         i++;
