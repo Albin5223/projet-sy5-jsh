@@ -17,7 +17,7 @@ int numberOfRedirection(char **commande){
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            number++; // return number;
+            break;
         }
         if(strcmp(tmp,SIMPLE)==0){
             number++;        
@@ -81,7 +81,7 @@ int isRedirectionStandart(char **commande){
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            return -1;  // break;
+            break;
         }
         if(strcmp(tmp,SIMPLE)==0){
             return i;
@@ -106,7 +106,7 @@ int isRedirectionErreur(char **commande){
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
-            return -1;  // break;
+            break;
         }
         if(strcmp(tmp,SORTIE_ERREUR)==0){
             return i;
@@ -127,41 +127,57 @@ int isRedirectionErreur(char **commande){
  * @brief Retourne si la commande contient une redirection, si oui retourne l'index de la redirection
 */
 int isRedirection(char **commande){
-    int i = 0;
-    while(1){
-        char *tmp = commande[i];
-        if (tmp == NULL){
-            return -1; // break;
-        }
-        if(strcmp(tmp,SIMPLE)==0){
-            return i;
-        }
-        if(strcmp(tmp,FORCE)==0){
-            return i;
-        }
-        if(strcmp(tmp,SANS_ECRASEMENT)==0){
-            return i;
-        }
-        if(strcmp(tmp,SORTIE_ERREUR)==0){
-            return i;
-        }
-        if(strcmp(tmp,SORTIE_ERREUR_FORCE)==0){
-            return i;
-        }
-        if(strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
-            return i;
-        }
-        if(strcmp(tmp,ENTREE)==0){
-            return i;
-        }
-        i++;
+    int standard = isRedirectionStandart(commande);
+    int erreur = isRedirectionErreur(commande);
+
+    if(standard > 0 && erreur > 0){
+        return standard < erreur ? standard : erreur;
+    }
+    else if(standard > 0){
+        return standard;
+    }
+    else if(erreur > 0){
+        return erreur;
+    }
+    else{
+        return -1;
     }
 
-    return -1;
+    // int i = 0;
+    // while(1){
+    //     char *tmp = commande[i];
+    //     if (tmp == NULL){
+    //         return -1;
+    //     }
+    //     if(strcmp(tmp,SIMPLE)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,FORCE)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,SANS_ECRASEMENT)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,SORTIE_ERREUR)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,SORTIE_ERREUR_FORCE)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT)==0){
+    //         return i;
+    //     }
+    //     if(strcmp(tmp,ENTREE)==0){
+    //         return i;
+    //     }
+    //     i++;
+    // }
+
+    // return -1;
 }
 
 /**
- * @brief Retourne la commande avec les redirections mais s'arrête à la redirection
+ * @brief Retourne la commande mais elle s'arrete avant la redirection
 */
 char ** getCommandeOfRedirection (char **commande){
     int size = isRedirection(commande);
@@ -179,82 +195,85 @@ char ** getCommandeOfRedirection (char **commande){
 
 
 int* getDescriptorOfRedirection(char **commande){
-    int *fd = malloc(sizeof(int)*2);
-    fd[0]=-1;
-    fd[1]=-1;
+    int *fd = malloc(sizeof(int) * 3);
+    fd[0] = -1;   // entree standard
+    fd[1] = -1;   // sortie standard
+    fd[2] = -1;   // sortie erreur
 
-    int index_err = -1;
-    int index_std = -1;
+    int index_err = isRedirectionErreur(commande);
+    int index_std = isRedirectionStandart(commande);
 
     char *standard = NULL;
     char *erreur = NULL;
 
-    int i = 0;
-
     /*
     * On recupere le dernier fichier de redirection pour la sortie standard et la sortie erreur
     */
-    while(1){
-        char *tmp = commande[i];
-        if(tmp == NULL){
-            break;
-        }
-        if(strcmp(tmp,SIMPLE) == 0 || strcmp(tmp,FORCE) == 0 || strcmp(tmp,SANS_ECRASEMENT) == 0 || strcmp(tmp,ENTREE) == 0){
-            standard = commande[i+1];
-            index_std = i;
-        }
-        if(strcmp(tmp,SORTIE_ERREUR) == 0 || strcmp(tmp,SORTIE_ERREUR_FORCE) == 0 || strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT) == 0){
-            erreur = commande[i+1];
-            index_err = i;
-        }
-        i++;
-    }
+    // while(1){
+    //     char *tmp = commande[i];
+    //     if(tmp == NULL){
+    //         break;
+    //     }
+    //     if(strcmp(tmp,SIMPLE) == 0 || strcmp(tmp,FORCE) == 0 || strcmp(tmp,SANS_ECRASEMENT) == 0 || strcmp(tmp,ENTREE) == 0){
+    //         standard = commande[i+1];
+    //         index_std = i;
+    //     }
+    //     if(strcmp(tmp,SORTIE_ERREUR) == 0 || strcmp(tmp,SORTIE_ERREUR_FORCE) == 0 || strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT) == 0){
+    //         erreur = commande[i+1];
+    //         index_err = i;
+    //     }
+    //     i++;
+    // }
 
     /*
     *On ouvre le fichier en fonction de la redirection
     */
 
-    if(index_err >0){
+    if(index_err > 0){
+        erreur = commande[index_err + 1];
+
         if(strcmp(commande[index_err],SORTIE_ERREUR)==0){
-            fd[1] = open(erreur,O_WRONLY|O_CREAT|O_EXCL,0666);
+            fd[2] = open(erreur,O_WRONLY|O_CREAT|O_EXCL,0666);
         }
-        else{
-            if(strcmp(commande[index_err],SORTIE_ERREUR_FORCE)==0){
-                fd[1] = open(erreur,O_WRONLY|O_CREAT|O_TRUNC,0666);
-            }
-            else{
-                fd[1] = open(erreur,O_WRONLY|O_CREAT|O_APPEND,0666);
-            }
+        else if(strcmp(commande[index_err],SORTIE_ERREUR_FORCE)==0){
+            fd[2] = open(erreur,O_WRONLY|O_CREAT|O_TRUNC,0666);
+        }
+        else{   // SORTIE_ERREUR_SANS_ECRASEMENT
+            fd[2] = open(erreur,O_WRONLY|O_CREAT|O_APPEND,0666);
         }
     }
-    if(index_std>0){
+    if(index_std > 0){
+        standard = commande[index_std + 1];
+
         if(strcmp(commande[index_std],SIMPLE)==0){
-            fd[0] = open(standard,O_WRONLY|O_CREAT|O_EXCL,0666);
+            fd[1] = open(standard,O_WRONLY|O_CREAT|O_EXCL,0666);
         }
         else if(strcmp(commande[index_std],FORCE)==0){
-            fd[0] = open(standard,O_WRONLY|O_CREAT|O_TRUNC,0666);
+            fd[1] = open(standard,O_WRONLY|O_CREAT|O_TRUNC,0666);
         }
         else if(strcmp(commande[index_std],SANS_ECRASEMENT)==0){
-            fd[0] = open(standard,O_WRONLY|O_CREAT|O_APPEND,0666);
+            fd[1] = open(standard,O_WRONLY|O_CREAT|O_APPEND,0666);
         }
-        else{ //ENTREE
+        else{   // ENTREE
             fd[0] = open(standard,O_RDONLY,0666);
         }
     }
 
 
     /*
+    * On redirige l'entree standard 0 vers fd[0] si il est superieur a 0
     * On redirige la sortie standard 1 vers fd[0] si il est superieur a 0
     * On redirige la sortie erreur 2 vers fd[1] si il est superieur a 0
     */
 
-    if(fd[0]>0){
-        dup2(fd[0],1);
+    if(fd[0] > 0){
+        dup2(fd[0], 0);
     }
-    if(fd[1]>0){
-        dup2(fd[1],2);
+    if(fd[1] > 0){
+        dup2(fd[1], 1);
     }
-
-
+    if(fd[2] > 0){
+        dup2(fd[2], 2);
+    }
     return fd;
 }
