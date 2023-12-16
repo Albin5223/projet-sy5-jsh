@@ -215,78 +215,95 @@ int set_first_free_id() {
 
 int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
     pid_t pid = fork();
+
+    if (pid < 0) {  // Error
+        fprintf(stderr,"Error: fork failed.\n");
+        exit(1);
+    }
+
     if (pid == 0) { // Child process
         if (is_background) { // If the command is run in the background
             setpgid(0, 0); // Set the process group ID to the process ID
         }
 
+        int descripteur_entree_standart = -1;
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
 
-        int copie_sortie_standart = dup(STDOUT_FILENO);
-        int copie_sortie_erreur = dup(STDERR_FILENO);
+        // int copie_entree_standart = dup(STDIN_FILENO);
+        // int copie_sortie_standart = dup(STDOUT_FILENO);
+        // int copie_sortie_erreur = dup(STDERR_FILENO);
         /*
         * Mise en place des descripteurs en cas de redirections
         * On sait que la dernière redirection a la priorité, donc on a juste besoin de 2 descripteur, le premier pour la redirection pour la sortie standart
         * et le deuxième pour la redirection dans la sortie erreur
         * 
-        * Dans cette condition, si il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
+        * Dans cette condition, s'il y a la présence d'une ou plusieurs redirection, on va affecter les descripteurs correspondant puis excécuter la commande
         * avec la suite du code
         */
         if(isRedirection(commande_args) != -1 && !has_pipe){
             int *fd = getDescriptorOfRedirection(commande_args);
             if(fd[0] != -1){
-                descripteur_sortie_standart = fd[0];
+                descripteur_entree_standart = fd[0];
             }
             if(fd[1] != -1){
-                descripteur_sortie_erreur = fd[1];
+                descripteur_sortie_standart = fd[1];
+            }
+            if(fd[2] != -1){
+                descripteur_sortie_erreur = fd[2];
             }
 
-            if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
+            if(isRedirectionStandart(commande_args) != -1 && fd[1] == -1 && fd[0] == -1){
                 free(fd);
                 return 1;
             }
-            if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
+            if(isRedirectionErreur(commande_args) != -1 && fd[2] == -1){
                 free(fd);
                 return 1;
             }
 
-            //On récupère la commande cad : comm > fic, 
+            //On récupère la commande cad, on passe de : 'cmd > fic' à 'cmd'
             commande_args = getCommandeOfRedirection(commande_args);
             free(fd);
         }
 
         if (has_pipe) { // If the command has a pipe, we need to do the pipe
-            //int n = nbPipes(commande_args);
-            //char ** tab_no_pipes = noPipe(commande_args, n);
-            //int ret = doPipe(tab_no_pipes, n + 1);
-            //free_tab(tab_no_pipes);
             int ret = makePipe(commande_args);
             exit(ret);
         }
         else{   // If the command does not have a pipe, we can just execute it
+            if (descripteur_entree_standart > 0) {
+                dup2(descripteur_entree_standart, 0);
+            }
+            if (descripteur_sortie_standart > 0) {
+                dup2(descripteur_sortie_standart, 1);
+            }
+            if (descripteur_sortie_erreur > 0) {
+                dup2(descripteur_sortie_erreur, 2);
+            }
+            
             execvp(commande_args[0], commande_args);
             const char *error = strerror(errno);
             fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
             exit(1);    // If execvp returns, there was an error
         }
-
         /*
         *Si les descripteurs sont difféérents de -1 alors c'est qu'il y a un fichier qui est ouvert
         */
-        if(descripteur_sortie_erreur >0){
-            close(descripteur_sortie_erreur);
-            dup2(copie_sortie_erreur,2);
-        }
-        if(descripteur_sortie_standart >0){
-            close(descripteur_sortie_standart);
-            dup2(copie_sortie_standart,1);
-        }
-    }
-    else if (pid < 0) { // Error
-        fprintf(stderr,"Error: fork failed.\n");
-        exit(1);
-    }
+
+        // if(descripteur_entree_standart > 0){
+        //         close(descripteur_entree_standart);
+        //         dup2(copie_entree_standart, 0);
+        // }
+        // if(descripteur_sortie_standart > 0){
+        //     close(descripteur_sortie_standart);
+        //     dup2(copie_sortie_standart, 1);
+        // }
+        // if(descripteur_sortie_erreur > 0){
+        //     close(descripteur_sortie_erreur);
+        //     dup2(copie_sortie_erreur, 2);
+        // }
+    }       // grep "strcmp" < redirection.c 
     else {  // Parent process
         if (!is_background) { // If the command is not run in the background
             int status;
