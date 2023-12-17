@@ -192,9 +192,6 @@ char ** getCommandeOfRedirection (char **commande){
     }
 
     newCommande[size] = NULL;
-    for (unsigned i = size; commande[i] != NULL; i++) {
-        free(commande[i]);
-    }
 
     free(commande);
     return newCommande;

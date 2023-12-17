@@ -190,35 +190,31 @@ int handle_exit(char **commande_args, int fd, int last_return_code) {
     }
 }
 
-
 int handle_internal_commands(char **commande_args, int *last_return_code, char **precedent, int has_pipe) {
     int ret;
     int *fd = NULL;
+    int isInternalCommand = !strcmp(commande_args[0], "exit") || !strcmp(commande_args[0], "?") ||
+                            !strcmp(commande_args[0], "cd") || !strcmp(commande_args[0], "jobs") ||
+                            !strcmp(commande_args[0], "kill");
 
-    if(isRedirection(commande_args) != -1 && !has_pipe){
+    if (isInternalCommand && isRedirection(commande_args) != -1 && !has_pipe) {
         fd = getDescriptorOfRedirection(commande_args);
 
-        if(isRedirectionStandart(commande_args) != -1 && fd[1] == -1 && fd[0] == -1){
+        if (isRedirectionStandart(commande_args) != -1 && fd[1] == -1 && fd[0] == -1) {
             free(fd);
             return 1;
         }
-        if(isRedirectionErreur(commande_args) != -1 && fd[2] == -1){
+        if (isRedirectionErreur(commande_args) != -1 && fd[2] == -1) {
             free(fd);
             return 1;
         }
-        
-        //On récupère la commande cad, on passe de : 'cmd > fic' à 'cmd'
+
         commande_args = getCommandeOfRedirection(commande_args);
     }
 
     if (strcmp(commande_args[0], "exit") == 0) {
-        if (fd != NULL) {
-            ret = handle_exit(commande_args, fd[0], *last_return_code);
-        } 
-        else {
-            ret = handle_exit(commande_args, -1, *last_return_code);
-        }
-    } 
+        ret = handle_exit(commande_args, ((fd != NULL) ? fd[0] : -1), *last_return_code);
+    }
     else if (strcmp(commande_args[0], "?") == 0) {
         printf("%d\n", *last_return_code);
         ret = 0;
@@ -235,7 +231,8 @@ int handle_internal_commands(char **commande_args, int *last_return_code, char *
     else {
         return -1;  // -> donc on execute la commande externe
     }
-    
+
+    // Libération de la mémoire des descripteurs de fichier si nécessaire
     free(fd);
     return ret;
 }
