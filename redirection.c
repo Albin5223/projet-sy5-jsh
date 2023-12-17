@@ -92,6 +92,9 @@ int isRedirectionStandart(char **commande){
         if(strcmp(tmp,SANS_ECRASEMENT)==0){
             return i;
         }
+        if(strcmp(tmp,ENTREE)==0){
+            return i;
+        }
         i++;
     }
 
@@ -176,18 +179,22 @@ int isRedirection(char **commande){
     // return -1;
 }
 
-/**
+/** ex : on passe de : 'cmd > fic' à 'cmd'
  * @brief Retourne la commande mais elle s'arrete avant la redirection
 */
 char ** getCommandeOfRedirection (char **commande){
     int size = isRedirection(commande);
     char **newCommande= malloc(sizeof(char*) * (size + 1));
+    check_malloc(newCommande);
 
     for(unsigned i = 0; i < size; i++){
         newCommande[i] = commande[i];
     }
 
     newCommande[size] = NULL;
+    for (unsigned i = size; commande[i] != NULL; i++) {
+        free(commande[i]);
+    }
 
     free(commande);
     return newCommande;

@@ -75,10 +75,8 @@ void remove_last_char(char **str) {
 */
 int len (char ** str) {
     int i = 0;
-    while (str[i] != NULL) {
-        i++;
-    }
-    return i;
+    while (str[i++] != NULL);
+    return i-1;
 }
 
 char** get_tab_of_commande (char* commande){
@@ -132,4 +130,11 @@ bool is_number(const char *str) {
         str++;
     }
     return true;
+}
+
+void check_malloc(void *ptr) {
+    if(ptr == NULL) {
+        fprintf(stderr,"Error in 'check_malloc' : couldn't malloc...\n");
+        exit(1);
+    }
 }
