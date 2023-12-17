@@ -75,10 +75,8 @@ void remove_last_char(char **str) {
 */
 int len (char ** str) {
     int i = 0;
-    while (str[i] != NULL) {
-        i++;
-    }
-    return i;
+    while (str[i++] != NULL);
+    return i-1;
 }
 
 char** get_tab_of_commande (char* commande){

@@ -23,6 +23,8 @@
 */
 #define TRONCATURE_SHELL 30
 
+int is_running = 1;
+
 /**
  * @brief Execute the command 'pwd' and return the path
 */
@@ -40,14 +42,8 @@ char *execute_pwd(){
     return pwd;
 }
 
-int execute_commande_externe(char **commande_args){
-    int n = nbPipes(commande_args); //On regarde le nombre de pipes
-    if(n != 0){ //Si il y a des pipes alors on execute la fonction add_jobs avec true en parametre
-        return add_job(commande_args,true);
-    }
-    else{ //sinon on execute la fonction add_jobs avec false en parametre
-        return add_job(commande_args,false);
-    }
+int execute_commande_externe(char **commande_args, int has_pipe){
+    return add_job(commande_args, (has_pipe > 0));
 }
 
 int change_precedent(char **prec,char *new){
@@ -129,17 +125,138 @@ char *path_shell(char *signe, enum color job, enum color path){
     return prompt;
 }
 
+int handle_kill(char **commande_args, int has_pipe) {
+    bool wrong_args = false;
+    if(len(commande_args) == 2){    // if we have command like "kill %1"
+        if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
+            return kill_id(atoi(commande_args[1]+1));   // We remove the first character of the string (the %) and we convert it to an int
+        }
+        else{
+            wrong_args = true;
+        }
+    }
+    else if(len(commande_args) == 3){   // if we have command like "kill -9 %1"
+        if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
+            return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
+        }
+        else{
+            wrong_args = true;
+        }
+
+    }
+    else{
+        wrong_args = true;
+    }
+
+    if(wrong_args){
+        return execute_commande_externe(commande_args, has_pipe);
+    }
+    return 0;
+}
+
+
+int handle_exit(char **commande_args, int fd, int last_return_code) {
+    int numberOfJobs = getNbJobs();
+    if(numberOfJobs != 0){  // If there are jobs running, we print an error message
+        printf("Il y a %d jobs en cours d'execution\n",numberOfJobs);
+        return 1;
+    }
+    else{
+        if(len(commande_args) > 2){ // If there are more than 2 arguments, we print an error message
+            printf("Erreur: exit prend un seul argument\n");
+            return 1;
+        }
+        else if(len(commande_args) == 2){
+            if(!is_number(commande_args[1])){   // If there is one argument and it's not a number, we print an error message
+                printf("Erreur: argument de exit non valide\n");
+                return 1;
+            }
+            else{   // If there is one argument and it's a number, we exit with the return code
+                is_running = 0;
+                return atoi(commande_args[1]);
+            }
+        }
+        else{
+            is_running = 0;
+            if (fd != -1){
+                char buf[1024];
+                int n = read(fd, buf, 1024);
+                if (n > 0) buf[n] = '\0';
+                return atoi(buf);
+            } else {
+                return last_return_code;
+            }
+        }
+    }
+}
+
+
+int handle_internal_commands(char **commande_args, int *last_return_code, char **precedent, int has_pipe) {
+    int ret;
+    int *fd = NULL;
+
+    if(isRedirection(commande_args) != -1 && !has_pipe){
+        fd = getDescriptorOfRedirection(commande_args);
+
+        if(isRedirectionStandart(commande_args) != -1 && fd[1] == -1 && fd[0] == -1){
+            free(fd);
+            return 1;
+        }
+        if(isRedirectionErreur(commande_args) != -1 && fd[2] == -1){
+            free(fd);
+            return 1;
+        }
+
+        //On récupère la commande cad, on passe de : 'cmd > fic' à 'cmd'
+        commande_args = getCommandeOfRedirection(commande_args);
+        for (int i = 0; i < len(commande_args); i++) {
+            printf("%s\n", commande_args[i]);
+        }
+    }
+
+    if (strcmp(commande_args[0], "exit") == 0) {
+        if (fd != NULL) {
+            ret = handle_exit(commande_args, fd[0], *last_return_code);
+        } 
+        else {
+            ret = handle_exit(commande_args, -1, *last_return_code);
+        }
+    } 
+    else if (strcmp(commande_args[0], "?") == 0) {
+        printf("%d\n", *last_return_code);
+        ret = 0;
+    } 
+    else if (strcmp(commande_args[0], "cd") == 0) {
+        ret = execute_cd(commande_args, precedent);
+    } 
+    else if (strcmp(commande_args[0], "jobs") == 0) {
+        ret = print_all_jobs();
+    } 
+    else if (strcmp(commande_args[0], "kill") == 0) {
+        ret = handle_kill(commande_args, has_pipe);
+    } 
+    else {
+        return -1;  // -> donc on execute la commande externe
+    }
+    
+    free(fd);
+    return ret;
+}
+
+
 int main(int argc, char const *argv[]){
     
     char *input;
     char *precedent = execute_pwd();
-   
+    char **commande_args;
+
     int last_return_code = 0;
+    int has_pipe;
     
     using_history();
     rl_outstream = stderr;
 
-    while(1){
+    while(is_running){
 
         char *path = path_shell("$ ", green, blue);
         
@@ -147,7 +264,8 @@ int main(int argc, char const *argv[]){
         verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
         add_history(input);
         if(input == NULL){
-            exit(last_return_code);
+            is_running = 0;
+            continue;
         }
         free(path);
 
@@ -155,94 +273,29 @@ int main(int argc, char const *argv[]){
         if(strlen(input) == 0){    // If the input is empty after removing the last spaces, we continue
             continue;
         }
-
-        char **commande_args;
+        
         commande_args = get_tab_of_commande(input);
         if(commande_args == NULL){
             continue;
         }
-
-        if(strcmp(commande_args[0],"exit") == 0){
-            int numberOfJobs = getNbJobs();
-            if(numberOfJobs != 0){  // If there are jobs running, we print an error message
-                printf("Il y a %d jobs en cours d'execution\n",numberOfJobs);
-                last_return_code = 1;
-            }
-            else{
-                if(len(commande_args) > 2){ // If there are more than 2 arguments, we print an error message
-                    printf("Erreur: exit prend un seul argument\n");
-                    last_return_code = 1;
-                }
-                else if(len(commande_args) == 2 && !is_number(commande_args[1])){   // If there is one argument and it's not a number, we print an error message
-                    printf("Erreur: argument de exit non valide\n");
-                    last_return_code = 1;
-                }
-                else if(len(commande_args) == 2){   // If there is one argument and it's a number, we exit with the return code
-                    last_return_code = atoi(commande_args[1]);
-                    free(commande_args);
-                    free(input);
-                    free(precedent);
-                    clear_history();
-                    exit(last_return_code);
-                }
-                else{   // If there is no argument, we exit with the return code
-                    free(commande_args);
-                    free(input);
-                    free(precedent);
-                    clear_history();
-                    exit(last_return_code);
-                }
-            }
-            
-        }
-        else if (strcmp(commande_args[0],"?") == 0){
-            printf("%d\n",last_return_code);
-            last_return_code = 0;
-        }
-        else if(strcmp(commande_args[0],"cd") == 0){
-            last_return_code = execute_cd(commande_args, &precedent);
-        }
-        else if(strcmp(commande_args[0],"jobs") == 0){
-            last_return_code = print_all_jobs();
-        }
-        else if(strcmp(commande_args[0],"kill") == 0){
-            bool wrong_args = false;
-            if(len(commande_args) == 2){    // if we have command like "kill %1"
-                if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
-                    last_return_code = kill_id(atoi(commande_args[1]+1));   // We remove the first character of the string (the %) and we convert it to an int
-                }
-                else{
-                    wrong_args = true;
-                }
-            }
-            else if(len(commande_args) == 3){   // if we have command like "kill -9 %1"
-                if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
-                    last_return_code = send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
-                }
-                else{
-                    wrong_args = true;
-                }
-
-            }
-            else{
-                wrong_args = true;
-            }
-
-            if(wrong_args){
-                last_return_code = execute_commande_externe(commande_args);
-            }
-        }
-        else{
-            last_return_code = execute_commande_externe(commande_args);
-        }
         
+        has_pipe = nbPipes(commande_args);
+        int result = handle_internal_commands(commande_args, &last_return_code, &precedent, has_pipe);
+        if (result != -1) {
+            last_return_code = result;
+        } else {
+            last_return_code = execute_commande_externe(commande_args, has_pipe);
+        }
+
         free(commande_args);
         free(input);
+
     }
 
+    // free(commande_args);
+    // free(input);
     free(precedent);
     clear_history();
     
-    
-    return 0;
+    return last_return_code;
 }
