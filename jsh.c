@@ -276,21 +276,12 @@ int main(int argc, char const *argv[]){
             continue;
         }
         
-<<<<<<< HEAD
-        nb_pipes = nbPipes(commande_args);
-        int result = handle_internal_commands(commande_args, &last_return_code, &precedent, nb_pipes);
-        if (result != -1) {
-            last_return_code = result;
-        } else {
-            last_return_code = execute_commande_externe(commande_args, nb_pipes);
-=======
         has_pipe = nbPipes(commande_args);
         int result = handle_internal_commands(commande_args, &last_return_code, &precedent, has_pipe);
         if (result != -1) {
             last_return_code = result;
         } else {
             last_return_code = execute_commande_externe(commande_args, has_pipe);
->>>>>>> 5289b421a7fba4b8e0bc62ec728cc91e346dd4ac
         }
 
         free(commande_args);
