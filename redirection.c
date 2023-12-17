@@ -177,6 +177,21 @@ char ** getCommandeOfRedirection (char **commande){
     return newCommande;
 }
 
+char **getCommandeWithoutRedirectionEntree(char **commande_args){
+    int i = isRedirectionEntree(commande_args);
+    int sizeFinal = len(commande_args) - 2;
+    char **newCommande = malloc(sizeof(char*) * (sizeFinal + 1));
+    int j = 0;
+    for(int k = 0; k < len(commande_args); k++){
+        if(k != i && k != i+1){
+            newCommande[j] = commande_args[k];
+            j++;
+        }
+    }
+    newCommande[sizeFinal] = NULL;
+    free(commande_args);
+    return newCommande;
+}
 
 int* getDescriptorOfRedirection(char **commande){
     int *fd = malloc(sizeof(int)*2);

@@ -14,5 +14,6 @@ int remove_job(int pid);
 int print_all_jobs();
 int getNbJobs();
 void verify_done_jobs();
+int execute_commande(char **commande_args);
 
 #endif

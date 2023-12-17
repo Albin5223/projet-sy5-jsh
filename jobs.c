@@ -12,6 +12,7 @@
 #include "colors.h"
 #include "pipe.h"
 #include "redirection.h"
+#include "internalCommand.h"
 
 typedef struct {
     char **cmd;
@@ -213,7 +214,13 @@ int set_first_free_id() {
     return -1;
 }
 
+
 int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
+
+    if(isInternalCommand(commande_args) && !is_background){
+        return executeInternalCommand(commande_args);
+    }
+
     pid_t pid = fork();
     if (pid == 0) { // Child process
         if (is_background) { // If the command is run in the background
@@ -223,10 +230,6 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
         int descripteur_entree = -1; 
-
-        int copie_sortie_standart = dup(STDOUT_FILENO);
-        int copie_sortie_erreur = dup(STDERR_FILENO);
-        int copie_entree = dup(STDIN_FILENO);
         
         /*
         * Mise en place des descripteurs en cas de redirections
@@ -240,10 +243,10 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             descripteur_entree = getFichierEntree(commande_args);
             if(descripteur_entree == -1){
                 fprintf(stderr,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));
-                return 1;
+                exit(1);
             }
             dup2(descripteur_entree,0);
-            commande_args = getCommandeOfRedirection(commande_args);
+            commande_args = getCommandeWithoutRedirectionEntree(commande_args);
         }
 
         if(isRedirection(commande_args) != -1 && !has_pipe){
@@ -257,49 +260,24 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
             if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
                 free(fd);
-                return 1;
+                fprintf(stderr,"bash: sortie: %s\n", "cannot overwrite existing file");
+                exit(1);
             }
             if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
                 free(fd);
-                return 1;
+                exit(1);
             }
 
             //On récupère la commande cad : comm > fic, 
             commande_args = getCommandeOfRedirection(commande_args);
             free(fd);
         }
-
-        if (has_pipe) { // If the command has a pipe, we need to do the pipe
-            //int n = nbPipes(commande_args);
-            //char ** tab_no_pipes = noPipe(commande_args, n);
-            //int ret = doPipe(tab_no_pipes, n + 1);
-            //free_tab(tab_no_pipes);
-            int ret = makePipe(commande_args);
-            exit(ret);
-        }
-        else{   // If the command does not have a pipe, we can just execute it
-            execvp(commande_args[0], commande_args);
-            const char *error = strerror(errno);
-            fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
-            //free_tab(commande_args);
-            exit(1);    // If execvp returns, there was an error
-        }
-
-        /*
-        *Si les descripteurs sont difféérents de -1 alors c'est qu'il y a un fichier qui est ouvert
-        */
-        if(descripteur_sortie_erreur >0){
-            close(descripteur_sortie_erreur);
-            dup2(copie_sortie_erreur,2);
-        }
-        if(descripteur_sortie_standart >0){
-            close(descripteur_sortie_standart);
-            dup2(copie_sortie_standart,1);
-        }
-        if(descripteur_entree >0){
-            close(descripteur_entree);
-            dup2(copie_entree,0);
-        }
+        // If the command does not have a pipe, we can just execute it
+        execvp(commande_args[0], commande_args);
+        const char *error = strerror(errno);
+        fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
+        //free_tab(commande_args);
+        exit(1);    // If execvp returns, there was an error
     }
     else if (pid < 0) { // Error
         fprintf(stderr,"Error: fork failed.\n");
@@ -441,4 +419,16 @@ void verify_done_jobs() {
 */
 int getNbJobs() {
     return job_count;
+}
+
+
+
+int execute_commande(char **commande_args){
+    int n = nbPipes(commande_args); //On regarde le nombre de pipes
+    if(n != 0){ //Si il y a des pipes alors on execute la fonction add_jobs avec true en parametre
+        return add_job(commande_args,true);
+    }
+    else{ //sinon on execute la fonction add_jobs avec false en parametre
+        return add_job(commande_args,false);
+    }
 }
