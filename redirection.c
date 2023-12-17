@@ -213,29 +213,6 @@ int* getDescriptorOfRedirection(char **commande){
     char *standard = NULL;
     char *erreur = NULL;
 
-    /*
-    * On recupere le dernier fichier de redirection pour la sortie standard et la sortie erreur
-    */
-    // while(1){
-    //     char *tmp = commande[i];
-    //     if(tmp == NULL){
-    //         break;
-    //     }
-    //     if(strcmp(tmp,SIMPLE) == 0 || strcmp(tmp,FORCE) == 0 || strcmp(tmp,SANS_ECRASEMENT) == 0 || strcmp(tmp,ENTREE) == 0){
-    //         standard = commande[i+1];
-    //         index_std = i;
-    //     }
-    //     if(strcmp(tmp,SORTIE_ERREUR) == 0 || strcmp(tmp,SORTIE_ERREUR_FORCE) == 0 || strcmp(tmp,SORTIE_ERREUR_SANS_ECRASEMENT) == 0){
-    //         erreur = commande[i+1];
-    //         index_err = i;
-    //     }
-    //     i++;
-    // }
-
-    /*
-    *On ouvre le fichier en fonction de la redirection
-    */
-
     if(index_err > 0){
         erreur = commande[index_err + 1];
 

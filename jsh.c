@@ -42,8 +42,8 @@ char *execute_pwd(){
     return pwd;
 }
 
-int execute_commande_externe(char **commande_args, int nb_pipes){
-    return add_job(commande_args, (nb_pipes > 0));
+int execute_commande_externe(char **commande_args, int has_pipe){
+    return add_job(commande_args, (has_pipe > 0));
 }
 
 int change_precedent(char **prec,char *new){
@@ -125,7 +125,7 @@ char *path_shell(char *signe, enum color job, enum color path){
     return prompt;
 }
 
-int handle_kill(char **commande_args, int nb_pipes) {
+int handle_kill(char **commande_args, int has_pipe) {
     bool wrong_args = false;
     if(len(commande_args) == 2){    // if we have command like "kill %1"
         if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
@@ -149,7 +149,7 @@ int handle_kill(char **commande_args, int nb_pipes) {
     }
 
     if(wrong_args){
-        return execute_commande_externe(commande_args, nb_pipes);
+        return execute_commande_externe(commande_args, has_pipe);
     }
     return 0;
 }
@@ -191,11 +191,11 @@ int handle_exit(char **commande_args, int fd, int last_return_code) {
 }
 
 
-int handle_internal_commands(char **commande_args, int *last_return_code, char **precedent, int nb_pipes) {
+int handle_internal_commands(char **commande_args, int *last_return_code, char **precedent, int has_pipe) {
     int ret;
     int *fd = NULL;
 
-    if(isRedirection(commande_args) != -1 && !nb_pipes){
+    if(isRedirection(commande_args) != -1 && !has_pipe){
         fd = getDescriptorOfRedirection(commande_args);
 
         if(isRedirectionStandart(commande_args) != -1 && fd[1] == -1 && fd[0] == -1){
@@ -230,11 +230,12 @@ int handle_internal_commands(char **commande_args, int *last_return_code, char *
         ret = print_all_jobs();
     } 
     else if (strcmp(commande_args[0], "kill") == 0) {
-        ret = handle_kill(commande_args, nb_pipes);
+        ret = handle_kill(commande_args, has_pipe);
     } 
     else {
         return -1;  // -> donc on execute la commande externe
     }
+    
     free(fd);
     return ret;
 }
@@ -247,7 +248,7 @@ int main(int argc, char const *argv[]){
     char **commande_args;
 
     int last_return_code = 0;
-    int nb_pipes;
+    int has_pipe;
     
     using_history();
     rl_outstream = stderr;
@@ -275,12 +276,21 @@ int main(int argc, char const *argv[]){
             continue;
         }
         
+<<<<<<< HEAD
         nb_pipes = nbPipes(commande_args);
         int result = handle_internal_commands(commande_args, &last_return_code, &precedent, nb_pipes);
         if (result != -1) {
             last_return_code = result;
         } else {
             last_return_code = execute_commande_externe(commande_args, nb_pipes);
+=======
+        has_pipe = nbPipes(commande_args);
+        int result = handle_internal_commands(commande_args, &last_return_code, &precedent, has_pipe);
+        if (result != -1) {
+            last_return_code = result;
+        } else {
+            last_return_code = execute_commande_externe(commande_args, has_pipe);
+>>>>>>> 5289b421a7fba4b8e0bc62ec728cc91e346dd4ac
         }
 
         free(commande_args);
@@ -288,6 +298,8 @@ int main(int argc, char const *argv[]){
 
     }
 
+    // free(commande_args);
+    // free(input);
     free(precedent);
     clear_history();
     
