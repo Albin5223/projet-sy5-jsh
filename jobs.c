@@ -334,9 +334,10 @@ int add_job(char **commande_args, bool has_pipe) {
         }
     }
 
-    int j;
-    for(j = 0; commands[j].cmd[0] != NULL; j++){
-        free(commands[j].cmd);
+    int j = 0;
+    for(int i = 0; commands[i].cmd[0] != NULL; i++){
+        free(commands[i].cmd);
+        j++;
     }
     free(commands[j].cmd);
     free(commands);
