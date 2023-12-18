@@ -95,9 +95,8 @@ int execute_cd(char **commande_args){
 int executeExit(char **commande_args){
     int numberOfJobs = getNbJobs();
     if(numberOfJobs != 0){  // If there are jobs running, we print an error message
-        printf("Il y a %d jobs en cours d'execution\n",numberOfJobs);
-        
-        return -1;
+        fprintf(stderr, "Il y a %d jobs en cours d'execution\n",numberOfJobs);
+        return 1;
     }
     else{
         if(len(commande_args) > 2){ // If there are more than 2 arguments, we print an error message

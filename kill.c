@@ -80,9 +80,9 @@ int send_signal_to_id(int id, int signal) {
 }
 
 /**
- * @brief kill a job with SIGKILL
+ * @brief kill a job with SIGTERM
  * @param id the id of the job
 */
 int kill_id(int id) {
-    return send_signal_to_id(id, SIGKILL);
+    return send_signal_to_id(id, SIGTERM);
 }
