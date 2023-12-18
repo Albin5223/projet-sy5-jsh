@@ -179,7 +179,7 @@ void print_job(Job job){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
-    printf("%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
+    fprintf(stderr,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
     free(job_id);
 }
 
@@ -187,7 +187,7 @@ void print_job_with_AND(Job job){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
-    printf("%s  %d  %s  %s %s\n", job_id, job.pid, status_to_string(job.status), job.cmd, "&");
+    fprintf(stderr,"%s  %d  %s  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd, "&");
     free(job_id);
 }
 
@@ -195,9 +195,10 @@ void print_pid_job(Job job){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     color_switch(&job_id, red);
-    printf("%s  %d\n", job_id, job.pid);
+    fprintf(stderr,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
     free(job_id);
 }
+
 
 /**
  * @brief Set the first free id in the list of jobs
@@ -364,7 +365,7 @@ int remove_job(int pid) {
             job_count--;
             return 0;
         }
-    }
+    } 
     printf("Error: job not found.\n");
     return 1;
 }

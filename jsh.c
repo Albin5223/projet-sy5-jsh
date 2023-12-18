@@ -81,7 +81,6 @@ int main(int argc, char const *argv[]){
         char *path = path_shell("$ ", green, blue);
         
         input = readline(path);
-        verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
         add_history(input);
         if(input == NULL){
             exit(getLastRetrunCode());
@@ -103,6 +102,7 @@ int main(int argc, char const *argv[]){
         int last = execute_commande(commande_args);
         setLastRetrunCode(last);
         
+        verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
 
         //On remet en place les dup
 
