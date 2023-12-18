@@ -365,7 +365,7 @@ int remove_job(int pid) {
             job_count--;
             return 0;
         }
-    }
+    } 
     printf("Error: job not found.\n");
     return 1;
 }
