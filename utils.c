@@ -2,7 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <ctype.h>
+
+
+/**
+ * Represents the maximum size of the path
+*/
+#define MAX_PATH_SIZE 2048
 
 /**
  * @brief Return the number of digits of the number n (including the signe)
@@ -132,9 +139,35 @@ bool is_number(const char *str) {
     return true;
 }
 
-void check_malloc(void *ptr) {
-    if(ptr == NULL) {
-        fprintf(stderr,"Error in 'check_malloc' : couldn't malloc...\n");
+/**
+ * @brief Execute the command 'pwd' and return the path
+*/
+char *execute_pwd(){
+    char *pwd = malloc(sizeof(char)*MAX_PATH_SIZE); // Allocating the path
+    if (!pwd) return NULL;      // -> adapter du coup tout le reste
+    if(getcwd(pwd,MAX_PATH_SIZE) == NULL){  // Getting the path
+        printf("Error in 'path_shell' : couldn't execute 'getcwd'...\n");
         exit(1);
     }
+    if ((pwd = realloc(pwd, sizeof(char) * (strlen(pwd) + 1))) == NULL) {   // Reallocating the path to the right size
+        printf("Error in 'path_shell' : couldn't realloc...\n");
+        exit(1);
+    }
+    return pwd;
 }
+
+char **add_tab_of_commande(char **tab, char **commande) {
+    int i = 0;
+    while (tab[i] != NULL) {
+        i++;
+    }
+    int j = 0;
+    while (commande[j] != NULL) {
+        tab[i] = commande[j];
+        i++;
+        j++;
+    }
+    tab[i] = NULL;
+    return tab;
+}
+    

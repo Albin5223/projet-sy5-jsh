@@ -19,5 +19,6 @@ char ** getCommandeOfRedirection (char **commande);
 int* getDescriptorOfRedirection(char **commande); 
 int nbPipes(char **commande);
 char ** noPipe(char ** commande, int nb);
+char **getCommandeWithoutRedirectionEntree(char **commande_args);
 
 #endif
