@@ -50,18 +50,18 @@ const char *status_to_string(enum status status){
     }
 }
 
-void print_job(Job job){
+void print_job(Job job, FILE *stream){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
-    color_switch(&job_id, red);
-    fprintf(stderr,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
+    //color_switch(&job_id, red); // Les couleurs ne font pas passer les tests... dommage
+    fprintf(stream,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
     free(job_id);
 }
 
-int print_job_with_pid(int pid){
+int print_job_with_pid(int pid, FILE *stream){
     for(int i = 0; i < job_count; i++){
         if(jobs[i].pid == pid){
-            print_job(jobs[i]);
+            print_job(jobs[i], stream);
             return 0;
         }
     }
@@ -201,7 +201,7 @@ enum status update_status(int pid) {
         }
         else if (WIFCONTINUED(status)) {
             jobs[get_position_with_pid(pid)].status = RUNNING;
-            print_job_with_pid(pid);
+            print_job_with_pid(pid,stderr);
             return RUNNING;
         }
         else {
@@ -323,7 +323,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
                     return exit_code;
                 }
                 else if(jobs[get_position_with_pid(pid)].status == STOPPED){
-                    print_job_with_pid(pid);
+                    print_job_with_pid(pid,stderr);
                     return 0;
                 }
                 else if(jobs[get_position_with_pid(pid)].status == RUNNING){
@@ -336,7 +336,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
             }
         }
         else{
-            return print_job_with_pid(pid);
+            return print_job_with_pid(pid,stderr);
         }      
     }
     return 0;
@@ -404,7 +404,7 @@ int print_all_jobs() {
             fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
             return -1;
         }
-        print_job(jobs[i]);
+        print_job(jobs[i], stdout);
         if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, remove it from the list
             if(remove_job(jobs[i].pid) != 0){
                 return 1;
@@ -428,7 +428,7 @@ void verify_done_jobs() {
             return;
         }
         if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
-            print_job(jobs[i]);
+            print_job(jobs[i],stderr);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
         else{   // If the job is still running, increment i
