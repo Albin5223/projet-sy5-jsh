@@ -6,7 +6,7 @@
 #define MAX_SUB_CMD_LEN 256
 #define MAX_SUBCOMMANDS 100
 
-enum status {RUNNING, DONE, STOPPED, CONTINUED, KILLED, DETACHED};
+enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED};
 
 int get_pid_by_id(int id);
 int add_job(char **commande_args, bool has_pipe);

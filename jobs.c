@@ -32,6 +32,7 @@ Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
 
+
 const char *status_to_string(enum status status){
     switch (status) {
         case RUNNING:
@@ -40,8 +41,6 @@ const char *status_to_string(enum status status){
             return "Done";
         case STOPPED:
             return "Stopped";
-        case CONTINUED:
-            return "Continued";
         case KILLED:
             return "Killed";
         case DETACHED:
@@ -49,6 +48,25 @@ const char *status_to_string(enum status status){
         default:
             return "Unknown";
     }
+}
+
+void print_job(Job job){
+    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
+    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
+    color_switch(&job_id, red);
+    fprintf(stderr,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
+    free(job_id);
+}
+
+int print_job_with_pid(int pid){
+    for(int i = 0; i < job_count; i++){
+        if(jobs[i].pid == pid){
+            print_job(jobs[i]);
+            return 0;
+        }
+    }
+    fprintf(stderr,"Error: job with pid %d not found.\n",pid);
+    return 1;
 }
 
 /**
@@ -134,6 +152,15 @@ int get_position_with_pid(int pid){
     return -1;
 }
 
+int get_id_with_pid(int pid){
+    for(int i = 0; i < job_count; i++){
+        if(jobs[i].pid == pid){
+            return jobs[i].id;
+        }
+    }
+    return -1;
+}
+
 /**
  * @brief Update the status of the job with the given pid
  * @param pid The pid of the job
@@ -145,11 +172,15 @@ enum status update_status(int pid) {
         // Child is still running
         if(jobs[get_position_with_pid(pid)].status == STOPPED){ // If the job was stopped, return stopped and do not update the status
             return STOPPED; 
-        } 
+        }
         else{   // Else, return running and update the status
             jobs[get_position_with_pid(pid)].status = RUNNING;
             return RUNNING;
         }   
+    }
+    else if(result == -1){
+        printf("Error: job [%d] not found.\n",get_id_with_pid(pid));
+        return -1;
     }
     else {
         // Child is done
@@ -165,39 +196,20 @@ enum status update_status(int pid) {
         }
         else if (WIFSTOPPED(status)) {
             jobs[get_position_with_pid(pid)].status = STOPPED;
+            jobs[get_position_with_pid(pid)].exit_code = WSTOPSIG(status); // Store the termination signal
             return STOPPED;
         }
         else if (WIFCONTINUED(status)) {
-            jobs[get_position_with_pid(pid)].status = CONTINUED;
-            return CONTINUED;
+            jobs[get_position_with_pid(pid)].status = RUNNING;
+            print_job_with_pid(pid);
+            return RUNNING;
         }
         else {
-            // TODO : handle DETACHED status
-            fprintf(stderr,"Error: unknown status.\n");
-            return -1;
+            jobs[get_position_with_pid(pid)].status = RUNNING;
+            return RUNNING;
         }
     }
 }
-
-void print_job(Job job){
-    char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
-    snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
-    color_switch(&job_id, red);
-    fprintf(stderr,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
-    free(job_id);
-}
-
-int print_job_with_pid(int pid){
-    for(int i = 0; i < job_count; i++){
-        if(jobs[i].pid == pid){
-            print_job(jobs[i]);
-            return 0;
-        }
-    }
-    fprintf(stderr,"Error: job with pid %d not found.\n",pid);
-    return 1;
-}
-
 
 /**
  * @brief Set the first free id in the list of jobs
@@ -238,9 +250,8 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
-        if (is_background) { // If the command is run in the background
-            setpgid(0, 0); // Set the process group ID to the process ID
-        }
+        setpgid(0, 0); // Set the process group ID to the process ID
+
 
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
@@ -315,10 +326,6 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
                     print_job_with_pid(pid);
                     return 0;
                 }
-                else if(jobs[get_position_with_pid(pid)].status == CONTINUED){
-                    print_job_with_pid(pid);
-                    return 0;
-                }
                 else if(jobs[get_position_with_pid(pid)].status == RUNNING){
                     continue;
                 }
@@ -374,6 +381,7 @@ int remove_job(int pid) {
             jobs[i].pid = -1;
             jobs[i].id = -1;
             jobs[i].status = -1;
+            jobs[i].exit_code = -1;
             // Shift all elements down to fill the gap
             for (int j = i; j < job_count - 1; j++) {
                 jobs[j] = jobs[j + 1];
