@@ -30,11 +30,11 @@ int send_signal_to_pid(int pid, int signal) {
 }
 
 /**
- * @brief kill a process with SIGKILL
+ * @brief kill a process with SIGTERM
  * @param pid the pid of the process
 */
 int kill_one(int pid) {
-    return send_signal_to_pid(pid, SIGKILL);
+    return send_signal_to_pid(pid, SIGTERM);
 }
 
 /**

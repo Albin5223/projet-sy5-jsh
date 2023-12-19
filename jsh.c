@@ -89,6 +89,7 @@ int main(int argc, char const *argv[]){
 
         remove_last_spaces(&input); // Removing the last spaces only after verifying that the input is not empty
         if(strlen(input) == 0){    // If the input is empty after removing the last spaces, we continue
+            verify_done_jobs();
             continue;
         }
 
