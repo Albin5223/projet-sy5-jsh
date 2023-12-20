@@ -252,10 +252,10 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
     if (pid == 0) { // Child process
         setpgid(0, 0); // Set the process group ID to the process ID
 
-
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
         int descripteur_entree = -1; 
+        
         
         /*
         * Mise en place des descripteurs en cas de redirections
@@ -266,6 +266,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         * avec la suite du code
         */
        if(isRedirectionEntree(commande_args)!= -1 && !has_pipe){
+           
             descripteur_entree = getFichierEntree(commande_args);
             if(descripteur_entree == -1){
                 dprintf(STDERR_FILENO,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));

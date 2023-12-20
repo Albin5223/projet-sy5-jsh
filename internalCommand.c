@@ -176,7 +176,7 @@ int getLastRetrunCode(){
 int executeInternalCommand(char **commande_args){
     int fd = -1;
     char buf[2048];
-
+    
     if(isRedirectionEntree(commande_args) != -1){
         fd = getFichierEntree(commande_args);
 
@@ -197,6 +197,28 @@ int executeInternalCommand(char **commande_args){
         }
 
         close(fd);
+    }
+
+    if(isRedirection(commande_args) != -1){
+        int *fd = getDescriptorOfRedirection(commande_args);
+
+        if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
+            free(fd);
+            dprintf(STDERR_FILENO,"bash: sortie: %s\n", "cannot overwrite existing file");
+            return 1;
+        }
+        if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
+            free(fd);
+            return 1;
+        }
+
+        //On récupère la commande cad : comm > fic, 
+        int size = isRedirection(commande_args);
+        commande_args[size] = NULL;
+        close(fd[0]);
+        close(fd[1]);
+        free(fd);
+        
     }
 
     if(strcmp(commande_args[0],"exit") == 0){
