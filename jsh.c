@@ -47,7 +47,7 @@ char *path_shell(char *signe, enum color job, enum color path){
 
     char *prompt = calloc(sizeof(char),strlen(pwd)+strlen(jobs)+strlen(signe)+1);  // Allocating the prompt
     if (prompt == NULL) {
-        fprintf(stderr,"Error in 'path_shell' : couldn't realloc...\n");
+        dprintf(STDERR_FILENO,"Error in 'path_shell' : couldn't realloc...\n");
         exit(1);
     }
 

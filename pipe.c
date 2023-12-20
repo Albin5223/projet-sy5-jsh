@@ -100,7 +100,7 @@ int doPipe(char **commande_args, int nb){
             char **commande_tab_i = get_tab_of_commande(commande_args[i]);
             execvp(commande_tab_i[0], commande_tab_i);
 
-            fprintf(stderr,"erreur avec commande : %s\n",commande_tab_i[0]);
+            dprintf(STDERR_FILENO,"erreur avec commande : %s\n",commande_tab_i[0]);
             exit(1);
         }
     }
