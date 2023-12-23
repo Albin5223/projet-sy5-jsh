@@ -151,9 +151,14 @@ int executeKill(char **commande_args){
         }
     }
 
+    //If we have command like "kill pid"
+    if(len(commande_args) == 2 && is_number_strict(commande_args[1])){
+        return kill(atoi(commande_args[1]),SIGTERM);
+    }
+
     //If we have command like "kill -9 pid"
     if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){
-        
+        return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
     }
 
     return -1;

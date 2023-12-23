@@ -258,14 +258,19 @@ void affiche(int sig){
 }
 
 int add_job_command(char **commande_args, bool is_background) {
-
+    int value;
     if(isInternalCommand(commande_args) && !is_background){
-        return executeInternalCommand(commande_args);
+        value= executeInternalCommand(commande_args);
     }
     
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
+        if(isInternalCommand(commande_args) && !is_background){
+            exit(value);
+        }
+        
+
         setpgid(0, 0); // Set the process group ID to the process ID
         
         int descripteur_sortie_standart = -1;

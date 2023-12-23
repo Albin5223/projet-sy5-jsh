@@ -102,6 +102,9 @@ int main(int argc, char const *argv[]){
         
         int last = execute_commande(commande_args);
         setLastRetrunCode(last);
+        if(strcmp(commande_args[0],"kill") == 0){
+            verify_done_jobs();
+        }
         
         if(!(isInternalCommand(commande_args) && strcmp(commande_args[0],"jobs") == 0 && len(commande_args) == 1)){ // If the command is not 'jobs' we verify the jobs (to not update the status twice)
             verify_done_jobs(); // We verify if there are jobs that are done, and we remove them from the list of jobs
