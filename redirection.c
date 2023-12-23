@@ -124,7 +124,7 @@ int isRedirectionErreur(char **commande){
 }
 
 /**
- * @brief Retourne si la commande contient une redirection, si oui retourne l'index de la redirection
+ * @brief Retourne si la commande contient une redirection, si oui retourne l'index de la premiere redirection
 */
 int isRedirection(char **commande){
     int i = 0;

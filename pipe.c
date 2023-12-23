@@ -25,6 +25,22 @@ int nbPipes(char **commande){
     return nb;
 }
 
+bool isPipe(char **commande){
+    int i = 0;
+    while(1){
+        char *tmp = commande[i];
+        if (tmp == NULL){
+            break;
+        }
+        if(strcmp(tmp,PIPE) == 0){
+            return true;
+        }
+        i++;
+    }
+
+    return false;
+}
+
 char ** noPipe(char ** commande, int nb) {
     int size = len(commande);
     char **tab_no_pipes = malloc(sizeof(char*) * ((size - nb) + 1));

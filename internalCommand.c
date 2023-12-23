@@ -129,41 +129,46 @@ int executeLastVal(){
 }
 
 int executeJobs(char **commandeArgs){
+    char pourcentage = '%';
     int size = len(commandeArgs);
 
     if (size == 1){
         print_all_jobs();
         return 0;
     }
-    dprintf(STDERR_FILENO,"Erreur: jobs prend un seul argument\n");
+    if (size == 2){
+        int id = atoi(commandeArgs[1]+1);
+        if (id == 0){
+            dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob], job > 0 \n",pourcentage);
+            return -1;
+        }
+        int pid = get_pid_by_id(id);
+        return print_job_with_pid(pid,1);
+    }
+    dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob] \n",pourcentage);
     return -1;
 }
 
 int executeKill(char **commande_args){
-    bool wrong_args = false;
     if(len(commande_args) == 2){    // if we have command like "kill %1"
         if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
             return kill_id(atoi(commande_args[1]+1));   // We remove the first character of the string (the %) and we convert it to an int
-        }
-        else{
-            wrong_args = true;
         }
     }
     else if(len(commande_args) == 3){   // if we have command like "kill -9 %1"
         if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
             return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
         }
-        else{
-            wrong_args = true;
-        }
-
-    }
-    else{
-        wrong_args = true;
     }
 
-    if(wrong_args){
-        return execute_commande(commande_args);
+    //If we have command like "kill pid"
+    if(len(commande_args) == 2 && is_number_strict(commande_args[1])){
+        return kill(atoi(commande_args[1]),SIGTERM);
+    }
+
+    //If we have command like "kill -9 pid"
+    if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){
+        return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
     }
 
     return -1;
@@ -176,7 +181,7 @@ int getLastRetrunCode(){
 int executeInternalCommand(char **commande_args){
     int fd = -1;
     char buf[2048];
-
+    
     if(isRedirectionEntree(commande_args) != -1){
         fd = getFichierEntree(commande_args);
 
@@ -197,6 +202,28 @@ int executeInternalCommand(char **commande_args){
         }
 
         close(fd);
+    }
+
+    if(isRedirection(commande_args) != -1){
+        int *fd = getDescriptorOfRedirection(commande_args);
+
+        if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
+            free(fd);
+            dprintf(STDERR_FILENO,"bash: sortie: %s\n", "cannot overwrite existing file");
+            return 1;
+        }
+        if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
+            free(fd);
+            return 1;
+        }
+
+        //On récupère la commande cad : comm > fic, 
+        int size = isRedirection(commande_args);
+        commande_args[size] = NULL;
+        close(fd[0]);
+        close(fd[1]);
+        free(fd);
+        
     }
 
     if(strcmp(commande_args[0],"exit") == 0){
