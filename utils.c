@@ -153,7 +153,6 @@ bool is_number_strict(const char *str){
 
 
 int getNumberOfString(char *s){
-    int i = 0;
     if(*s == '-'){
         return atoi(s+1);
     }
