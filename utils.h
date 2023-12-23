@@ -14,6 +14,8 @@ bool start_with_char_then_digits(char *str, char c);
 int is_number(const char *str);
 char *execute_pwd();
 char **add_tab_of_commande(char **tab, char **commande);
+int getNumberOfString(char *s);
+bool is_number_strict(const char *str);
 
 
 #endif

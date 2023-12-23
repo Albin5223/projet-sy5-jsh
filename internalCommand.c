@@ -140,30 +140,20 @@ int executeJobs(char **commandeArgs){
 }
 
 int executeKill(char **commande_args){
-    bool wrong_args = false;
     if(len(commande_args) == 2){    // if we have command like "kill %1"
         if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
             return kill_id(atoi(commande_args[1]+1));   // We remove the first character of the string (the %) and we convert it to an int
-        }
-        else{
-            wrong_args = true;
         }
     }
     else if(len(commande_args) == 3){   // if we have command like "kill -9 %1"
         if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
             return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
         }
-        else{
-            wrong_args = true;
-        }
-
-    }
-    else{
-        wrong_args = true;
     }
 
-    if(wrong_args){
-        return execute_commande(commande_args);
+    //If we have command like "kill -9 pid"
+    if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){
+        
     }
 
     return -1;

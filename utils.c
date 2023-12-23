@@ -141,6 +141,25 @@ bool is_number(const char *str) {
     return true;
 }
 
+bool is_number_strict(const char *str){
+    while(*str) {
+        if(!isdigit(*str)) {
+            return false;
+        }
+        str++;
+    }
+    return true;
+}
+
+
+int getNumberOfString(char *s){
+    int i = 0;
+    if(*s == '-'){
+        return atoi(s+1);
+    }
+    return atoi(s);
+}
+
 /**
  * @brief Execute the command 'pwd' and return the path
 */
