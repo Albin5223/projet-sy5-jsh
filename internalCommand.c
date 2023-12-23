@@ -60,7 +60,7 @@ int execute_cd(char **commande_args){
     if(size == 1 || strcmp( commande_args[1],"$HOME")==0 ){
         char *home = getenv("HOME");
         if(home == NULL){
-            fprintf(stderr,"Erreur: la variable d'environnement HOME n'est pas définie\n");
+            dprintf(STDERR_FILENO,"Erreur: la variable d'environnement HOME n'est pas définie\n");
             free(pwd);
             return 1;
         }
@@ -71,7 +71,7 @@ int execute_cd(char **commande_args){
     }
     if(size > 2){
         free(pwd);
-        fprintf(stderr,"Erreur: cd prend un seul %d argument\n", size);
+        dprintf(STDERR_FILENO,"Erreur: cd prend un seul %d argument\n", size);
         return 1;
     }
     if(strcmp(commande_args[1],"-") == 0){
@@ -80,7 +80,7 @@ int execute_cd(char **commande_args){
     else{
         int n = chdir(commande_args[1]);
           if(n == -1){
-            fprintf(stderr,"Erreur: le dossier n'existe pas\n");
+            dprintf(STDERR_FILENO,"Erreur: le dossier n'existe pas\n");
             free(pwd);
             return 1;
         }
@@ -95,7 +95,7 @@ int execute_cd(char **commande_args){
 int executeExit(char **commande_args){
     int numberOfJobs = getNbJobs();
     if(numberOfJobs != 0){  // If there are jobs running, we print an error message
-        fprintf(stderr, "Il y a %d jobs en cours d'execution\n",numberOfJobs);
+        dprintf(STDERR_FILENO, "Il y a %d jobs en cours d'execution\n",numberOfJobs);
         return 1;
     }
     else{
@@ -135,7 +135,7 @@ int executeJobs(char **commandeArgs){
         print_all_jobs();
         return 0;
     }
-    fprintf(stderr,"Erreur: jobs prend un seul argument\n");
+    dprintf(STDERR_FILENO,"Erreur: jobs prend un seul argument\n");
     return -1;
 }
 
@@ -181,12 +181,12 @@ int executeInternalCommand(char **commande_args){
         fd = getFichierEntree(commande_args);
 
         if(fd == -1){
-            fprintf(stderr,"Erreur: impossible de lire l'entree\n");
+            dprintf(STDERR_FILENO,"Erreur: impossible de lire l'entree\n");
             return -1;
         }
         
         if(read(fd,buf,2048) == -1){
-            fprintf(stderr,"Erreur: impossible de lire l'entree\n");
+            dprintf(STDERR_FILENO,"Erreur: impossible de lire l'entree\n");
             return -1;
         }
         buf[strlen(buf)-1] = '\0';

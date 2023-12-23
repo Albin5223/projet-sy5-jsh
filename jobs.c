@@ -50,22 +50,22 @@ const char *status_to_string(enum status status){
     }
 }
 
-void print_job(Job job, FILE *stream){
+void print_job(Job job, int std){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
     //color_switch(&job_id, red); // Les couleurs ne font pas passer les tests... dommage
-    fprintf(stream,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
+    dprintf(std,"%s  %d  %s  %s\n", job_id, job.pid, status_to_string(job.status), job.cmd);
     free(job_id);
 }
 
-int print_job_with_pid(int pid, FILE *stream){
+int print_job_with_pid(int pid, int std){
     for(int i = 0; i < job_count; i++){
         if(jobs[i].pid == pid){
-            print_job(jobs[i], stream);
+            print_job(jobs[i], std);
             return 0;
         }
     }
-    fprintf(stderr,"Error: job with pid %d not found.\n",pid);
+    dprintf(2,"Error: job with pid %d not found.\n",pid);
     return 1;
 }
 
@@ -222,7 +222,7 @@ int set_first_free_id() {
             return i;
         }
     }
-    fprintf(stderr,"Error: job list is full.\n");
+    dprintf(STDERR_FILENO,"Error: job list is full.\n");
     return -1;
 }
 
@@ -268,7 +268,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
        if(isRedirectionEntree(commande_args)!= -1 && !has_pipe){
             descripteur_entree = getFichierEntree(commande_args);
             if(descripteur_entree == -1){
-                fprintf(stderr,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));
+                dprintf(STDERR_FILENO,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));
                 exit(1);
             }
             dup2(descripteur_entree,0);
@@ -286,7 +286,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
 
             if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
                 free(fd);
-                fprintf(stderr,"bash: sortie: %s\n", "cannot overwrite existing file");
+                dprintf(STDERR_FILENO,"bash: sortie: %s\n", "cannot overwrite existing file");
                 exit(1);
             }
             if(isRedirectionErreur(commande_args) != -1 && fd[1] == -1){
@@ -301,12 +301,12 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
         // If the command does not have a pipe, we can just execute it
         execvp(commande_args[0], commande_args);
         const char *error = strerror(errno);
-        fprintf(stderr,"bash: %s: %s.\n", commande_args[0], error);
+        dprintf(STDERR_FILENO,"bash: %s: %s.\n", commande_args[0], error);
         //free_tab(commande_args);
         exit(1);    // If execvp returns, there was an error
     }
     else if (pid < 0) { // Error
-        fprintf(stderr,"Error: fork failed.\n");
+        dprintf(STDERR_FILENO,"Error: fork failed.\n");
         exit(1);
     }
     else {  // Parent process
@@ -330,7 +330,7 @@ int add_job_command(char **commande_args, bool is_background, bool has_pipe) {
                     continue;
                 }
                 else{
-                    fprintf(stderr,"Error: unknown status.\n");
+                    dprintf(STDERR_FILENO,"Error: unknown status.\n");
                     return 1;
                 }
             }
@@ -401,7 +401,7 @@ int print_all_jobs() {
     int i = 0;
     while (i < job_count){
         if(update_status(jobs[i].pid) == -1){
-            fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
+            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return -1;
         }
         print_job(jobs[i], stdout);
@@ -424,7 +424,7 @@ void verify_done_jobs() {
     int i = 0;
     while (i < job_count){
         if(update_status(jobs[i].pid) == -1){
-            fprintf(stderr,"Error: job [%d] not found.\n",jobs[i].id);
+            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return;
         }
         if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
