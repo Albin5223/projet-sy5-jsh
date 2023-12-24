@@ -82,12 +82,12 @@ int print_job_with_pid(int pid, int std){
  * @param commande_args The command to split
  * @return An array of commands
 */
-Command *split_commands_for_jobs(char **commande_args) {
-    // Count the number of "&" symbols
+Command *split_commands_for_jobs(char **commande_args,const char *delim) {
+    // Count the number of delimit symbols
     int command_count = 0;  // Start from 1 to account for the first command
     bool last_was_ampersand = false;
     for (int i = 0; commande_args[i] != NULL; i++) {
-        if (strcmp(commande_args[i], "&") == 0) {
+        if (strcmp(commande_args[i], delim) == 0) {
             command_count++;
             last_was_ampersand = true;
         } else {
@@ -95,7 +95,7 @@ Command *split_commands_for_jobs(char **commande_args) {
         }
     }
 
-    // If the last command wasn't followed by an "&", increment the command_count
+    // If the last command wasn't followed by an delimit, increment the command_count
     if (!last_was_ampersand) {
         command_count++;
     }
@@ -113,7 +113,7 @@ Command *split_commands_for_jobs(char **commande_args) {
             commands[j].cmd[k] = NULL;
             break;
         }
-        if (strcmp(tmp, "&") == 0) {
+        if (strcmp(tmp, delim) == 0) {
             commands[j].cmd[k] = NULL;
             commands[j].is_background = true;
             j++;
@@ -235,7 +235,7 @@ int set_first_free_id() {
 }
 
 int add_to_tab_of_jobs(int pid, char **commande_args){
-    jobs[job_count].numberChild= 0;
+    jobs[job_count].numberChild= -1;
     
     jobs[job_count].jobFather.cmd[0] = '\0'; // Start with an empty string
     for (int i = 0; commande_args[i] != NULL; i++) {
@@ -257,8 +257,8 @@ void affiche(int sig){
     printf("J'ai recu %d ",sig);
 }
 
-int add_job_command(char **commande_args, bool is_background) {
-    int value;
+int add_job_command_without_pipe(char **commande_args, bool is_background) {
+    int value; //Variable qui va stocker la valeur de retour de la commande interne
     if(isInternalCommand(commande_args) && !is_background){
         value= executeInternalCommand(commande_args);
     }
@@ -287,7 +287,7 @@ int add_job_command(char **commande_args, bool is_background) {
         * avec la suite du code
         */
 
-       if(isRedirectionEntree(commande_args)!= -1 && !isPipe(commande_args)){
+       if(isRedirectionEntree(commande_args)!= -1){
            
             descripteur_entree = getFichierEntree(commande_args);
             if(descripteur_entree == -1){
@@ -298,7 +298,7 @@ int add_job_command(char **commande_args, bool is_background) {
             commande_args = getCommandeWithoutRedirectionEntree(commande_args);
         }
 
-        if(isRedirection(commande_args) != -1 && !isPipe(commande_args)){
+        if(isRedirection(commande_args) != -1){
             int *fd = getDescriptorOfRedirection(commande_args);
             if(fd[0] != -1){
                 descripteur_sortie_standart = fd[0];
@@ -333,10 +333,6 @@ int add_job_command(char **commande_args, bool is_background) {
         exit(1);
     }
     else {  // Parent process
-        
-        if(isPipe(commande_args)){
-
-        }
 
         if(add_to_tab_of_jobs(pid, commande_args) != 0){    // If the job could not be added, return 1
             return 1;
@@ -370,20 +366,163 @@ int add_job_command(char **commande_args, bool is_background) {
     return 0;
 }
 
-int add_job(char **commande_args) {
-    Command *commands = split_commands_for_jobs(commande_args);
-    for (int i = 0; commands[i].cmd[0] != NULL; i++) {
-        int status = add_job_command(commands[i].cmd, commands[i].is_background);
-        if (status != 0) {
-            int j = 0;
-            for(int i = 0; commands[i].cmd[0] != NULL; i++){
-                free(commands[i].cmd);
-                j++;
+int add_child_of_jobs(int pidFather,int pidChild,char **commande_args){
+    for(int i = 0;i<job_count;i++){
+        if (jobs[i].jobFather.pid == pidFather){
+            if (jobs[i].numberChild == -1){
+                jobs[i].child = malloc(sizeof(Job)*MAX_CHILD);
+                jobs[i].numberChild = 0;
+                jobs[i].child[jobs[i].numberChild].pid = pidChild;
+                jobs[i].child[jobs[i].numberChild].id = jobs[i].numberChild;
+                jobs[i].child[jobs[i].numberChild].status = RUNNING;
+                jobs[i].child[jobs[i].numberChild].exit_code = -1;
+                int index = 0;
+                for (int j = 0;j<len(commande_args);j++){
+                    for(int k = 0;k<strlen(commande_args[j]);k++){
+                        jobs[i].child[jobs[i].numberChild].cmd[index] = commande_args[j][k];
+                        index ++;
+                    }
+                    jobs[i].child[jobs[i].numberChild].cmd[index] = ' ';
+                    index ++;
+                }
+                jobs[i].child[jobs[i].numberChild].cmd[index - 1] = '\0';
+                jobs[i].numberChild ++;
+
             }
-            free(commands[j].cmd);
-            free(commands);
-            return status;
+            else{
+                jobs[i].child[jobs[i].numberChild].pid = pidChild;
+                jobs[i].child[jobs[i].numberChild].id = jobs[i].numberChild;
+                jobs[i].child[jobs[i].numberChild].status = RUNNING;
+                jobs[i].child[jobs[i].numberChild].exit_code = -1;
+                int index = 0;
+                for (int j = 0;j<len(commande_args);j++){
+                    for(int k = 0;k<strlen(commande_args[j]);k++){
+                        jobs[i].child[jobs[i].numberChild].cmd[index] = commande_args[j][k];
+                        index ++;
+                    }
+                    jobs[i].child[jobs[i].numberChild].cmd[index] = ' ';
+                    index ++;
+                }
+                jobs[i].child[jobs[i].numberChild].cmd[index - 1] = '\0';
+                jobs[i].numberChild ++;
+            }
         }
+    }
+
+    return 0;
+}
+
+int add_job_command_with_pipe(char **commande_args, bool is_background){
+    int nbPipe = numberOfPipes(commande_args);
+    int fd[nbPipe][2];
+    Command *commands = split_commands_for_jobs(commande_args,"|");
+    int numberCommand = nbPipe + 1;
+    int tabPid[numberCommand];
+    int status;
+
+    
+    int pid = fork();
+    if(pid == 0){
+        setpgid(0,0);
+        for(int i = 0;i<nbPipe;i++){
+            if(pipe(fd[i]) == -1){
+                dprintf(STDERR_FILENO,"Error: pipe failed.\n");
+                return 1;
+            }
+        }
+        
+        for(int i = 0; i<numberCommand;i++){
+            tabPid[i] = fork();
+            if(tabPid[i] == 0){
+                if(i == 0){
+                    dup2(fd[0][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
+                    
+                    for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
+                        close(fd[j][0]);
+                        close(fd[j][1]);
+                    }
+                    
+                    execvp(commands[i].cmd[0],commands[i].cmd);
+
+                    exit(EXIT_FAILURE);
+                }
+                else{
+                    if(i==numberCommand-1){
+                        
+                        dup2(fd[i-1][0],STDIN_FILENO); //On redirige l'entrée standard vers le pipe
+                        
+                        for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
+                            close(fd[j][0]);
+                            close(fd[j][1]);
+                        }
+                        execvp(commands[i].cmd[0],commands[i].cmd);
+                        exit(EXIT_FAILURE);
+                    }
+                    else{
+                        
+                        dup2(fd[i-1][0],STDIN_FILENO); //On redirige l'entrée standard vers le pipe
+                        dup2(fd[i][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
+                        for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
+                            close(fd[j][0]);
+                            close(fd[j][1]);
+                        }
+                        execvp(commands[i].cmd[0],commands[i].cmd);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+        }
+        
+        for(int i = 0;i<nbPipe;i++){ //On ferme tous les descripteurs de fichiers des pipes
+            close(fd[i][0]);
+            close(fd[i][1]);
+        }
+        for(int i = 0;i<numberCommand;i++){ //On attend que tous les fils se terminent
+            waitpid(tabPid[i], &status, 0);
+        }
+        exit(status);
+        
+    }
+    else{
+        waitpid(pid,&status,0);
+        return status;
+    }
+    return 0;
+}
+
+
+
+int add_job(char **commande_args) {
+    Command *commands = split_commands_for_jobs(commande_args,"&");
+    int status;
+    for (int i = 0; commands[i].cmd[0] != NULL; i++) {
+        if(!isPipe(commands[i].cmd)){
+            status = add_job_command_without_pipe(commands[i].cmd, commands[i].is_background);
+            if (status != 0) {
+                int j = 0;
+                for(int i = 0; commands[i].cmd[0] != NULL; i++){
+                    free(commands[i].cmd);
+                    j++;
+                }
+                free(commands[j].cmd);
+                free(commands);
+                return status;
+            }
+        }
+        else{
+            status = add_job_command_with_pipe(commands[i].cmd, commands[i].is_background);
+            if (status != 0) {
+                int j = 0;
+                for(int i = 0; commands[i].cmd[0] != NULL; i++){
+                    free(commands[i].cmd);
+                    j++;
+                }
+                free(commands[j].cmd);
+                free(commands);
+                return status;
+            }
+        }
+        
     }
 
     int j = 0;
@@ -406,6 +545,14 @@ int remove_job(int pid) {
         if (jobs[i].jobFather.pid == pid) {
             id_taken[jobs[i].jobFather.id] = false;
             jobs[i].jobFather.cmd[0] = '\0';
+
+            //Free child
+            if(jobs[i].numberChild != -1){
+                for(int j = 0;j<jobs[i].numberChild;j++){
+                    jobs[i].child[j].cmd[0] = '\0';
+                }
+                free(jobs[i].child);
+            }
             jobs[i].jobFather.pid = -1;
             jobs[i].jobFather.id = -1;
             jobs[i].jobFather.status = -1;

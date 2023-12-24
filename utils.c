@@ -191,3 +191,30 @@ char **add_tab_of_commande(char **tab, char **commande) {
     return tab;
 }
     
+/**
+ * @brief Convert an integer to a string
+ * @param n The integer to convert
+ * @return The string --> must be freed
+*/
+char *int_to_string(int n) {
+    int len = number_length(n);
+    char *str = malloc(sizeof(char) * (len + 1));
+    if (!str) exit(1);
+    snprintf(str, len + 1, "%d", n);
+    *(str + len) = '\0';
+    return str;
+}
+
+
+void print_tab(char **tab) {
+    int i = 0;
+    while(1){
+        char *tmp = tab[i];
+        if(tmp == NULL) {
+            printf("NULL \n");
+            break;
+        }
+        printf("%s ", tmp);
+        i++;
+    }
+}

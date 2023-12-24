@@ -91,7 +91,6 @@ int execute_cd(char **commande_args){
 }
 
 
-
 int executeExit(char **commande_args){
     int numberOfJobs = getNbJobs();
     if(numberOfJobs != 0){  // If there are jobs running, we print an error message
