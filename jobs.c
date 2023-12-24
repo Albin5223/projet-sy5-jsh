@@ -236,7 +236,7 @@ int set_first_free_id() {
 }
 
 int add_to_tab_of_jobs(int pid, char **commande_args){
-    jobs[job_count].numberChild= 0;
+    jobs[job_count].numberChild = 0;
     
     jobs[job_count].jobFather.cmd[0] = '\0'; // Start with an empty string
     for (int i = 0; commande_args[i] != NULL; i++) {
@@ -265,16 +265,16 @@ int add_job_command(char **commande_args, bool is_background) {
     }
 
     if (nb_subs(commande_args) > 0) {
-        return execute_substitution_process(commande_args, nb_subs(commande_args));
+        value = execute_substitution_process(commande_args, nb_subs(commande_args));
     }
     
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
-        if(isInternalCommand(commande_args) && !is_background){
+
+        if ((isInternalCommand(commande_args) && !is_background) || (nb_subs(commande_args) > 0 && !is_background)) {
             exit(value);
         }
-        
 
         setpgid(0, 0); // Set the process group ID to the process ID
         

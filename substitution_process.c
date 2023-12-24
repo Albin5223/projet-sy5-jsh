@@ -69,7 +69,7 @@ char **get_substitution_process(char **command_args, int nb_subs) {
 
 /**
  * cat -n <( echo "Header" ) <( ps a ) <( echo "Footer" ) 
- * diff <( echo "aaaz" ) <( echo "zzz" )
+ * diff <( echo "aaaz" ) <( echo "zzz" ) &
 */
 
 /**
