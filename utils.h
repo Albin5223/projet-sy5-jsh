@@ -16,6 +16,9 @@ char *execute_pwd();
 char **add_tab_of_commande(char **tab, char **commande);
 int getNumberOfString(char *s);
 bool is_number_strict(const char *str);
+int malloc_ok(void *ptr);
+char **get_command_of(char **commande_args, char *x);
+void affiche_tab(char **tab);
 
 
 #endif

@@ -14,6 +14,7 @@
 #include "redirection.h"
 #include "internalCommand.h"
 #include "kill.h"
+#include "substitution_process.h"
 
 typedef struct {
     char **cmd;
@@ -260,7 +261,11 @@ void affiche(int sig){
 int add_job_command(char **commande_args, bool is_background) {
     int value;
     if(isInternalCommand(commande_args) && !is_background){
-        value= executeInternalCommand(commande_args);
+        value = executeInternalCommand(commande_args);
+    }
+
+    if (nb_subs(commande_args) > 0) {
+        return execute_substitution_process(commande_args, nb_subs(commande_args));
     }
     
 
