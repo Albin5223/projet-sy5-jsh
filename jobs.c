@@ -447,6 +447,10 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                         close(fd[j][1]);
                     }
                     
+                    if(isInternalCommand(commands[i].cmd)){
+                        status = executeInternalCommand(commands[i].cmd);
+                        exit(status);
+                    }
                     execvp(commands[i].cmd[0],commands[i].cmd);
 
                     exit(EXIT_FAILURE);
@@ -460,6 +464,11 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                             close(fd[j][0]);
                             close(fd[j][1]);
                         }
+
+                        if(isInternalCommand(commands[i].cmd)){
+                            status = executeInternalCommand(commands[i].cmd);
+                            exit(status);
+                        }
                         execvp(commands[i].cmd[0],commands[i].cmd);
                         exit(EXIT_FAILURE);
                     }
@@ -470,6 +479,11 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                         for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
                             close(fd[j][0]);
                             close(fd[j][1]);
+                        }
+
+                        if(isInternalCommand(commands[i].cmd)){
+                            status = executeInternalCommand(commands[i].cmd);
+                            exit(status);
                         }
                         execvp(commands[i].cmd[0],commands[i].cmd);
                         exit(EXIT_FAILURE);
@@ -489,8 +503,34 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
         
     }
     else{
-        waitpid(pid,&status,0);
-        return status;
+        if(add_to_tab_of_jobs(pid, commande_args) != 0){    // If the job could not be added, return 1
+            return 1;
+        }
+
+        if (!is_background) { // If the command is not run in the background
+            while (1){
+                update_status(pid);
+                if(jobs[get_position_with_pid(pid)].jobFather.status == DONE || jobs[get_position_with_pid(pid)].jobFather.status == KILLED){
+                    int exit_code = jobs[get_position_with_pid(pid)].jobFather.exit_code; // Get the exit code of the job
+                    remove_job(pid);
+                    return exit_code;
+                }
+                else if(jobs[get_position_with_pid(pid)].jobFather.status == STOPPED){
+                    print_job_with_pid(pid, STDERR_FILENO);
+                    return 0;
+                }
+                else if(jobs[get_position_with_pid(pid)].jobFather.status == RUNNING){
+                    continue;
+                }
+                else{
+                    dprintf(STDERR_FILENO,"Error: unknown status.\n");
+                    return 1;
+                }
+            }
+        }
+        else{
+            return print_job_with_pid(pid, STDERR_FILENO);
+        }      
     }
     return 0;
 }
