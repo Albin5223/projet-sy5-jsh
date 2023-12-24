@@ -14,6 +14,7 @@
 #include "redirection.h"
 #include "internalCommand.h"
 #include "kill.h"
+#include "substitution_process.h"
 
 typedef struct {
     char **cmd;
@@ -260,16 +261,20 @@ void affiche(int sig){
 int add_job_command_without_pipe(char **commande_args, bool is_background) {
     int value; //Variable qui va stocker la valeur de retour de la commande interne
     if(isInternalCommand(commande_args) && !is_background){
-        value= executeInternalCommand(commande_args);
+        value = executeInternalCommand(commande_args);
+    }
+
+    if (nb_subs(commande_args) > 0) {
+        value = execute_substitution_process(commande_args, nb_subs(commande_args));
     }
     
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
-        if(isInternalCommand(commande_args) && !is_background){
+
+        if ((isInternalCommand(commande_args) && !is_background) || (nb_subs(commande_args) > 0 && !is_background)) {
             exit(value);
         }
-        
 
         setpgid(0, 0); // Set the process group ID to the process ID
         

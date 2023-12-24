@@ -18,6 +18,9 @@ int getNumberOfString(char *s);
 bool is_number_strict(const char *str);
 char *int_to_string(int n);
 void print_tab(char **tab);
+int malloc_ok(void *ptr);
+char **get_command_of(char **commande_args, char *x);
+void affiche_tab(char **tab);
 
 
 #endif

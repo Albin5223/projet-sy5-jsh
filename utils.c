@@ -218,3 +218,43 @@ void print_tab(char **tab) {
         i++;
     }
 }
+
+int malloc_ok(void *ptr) {
+    if (ptr == NULL) {
+        printf("Error in 'path_shell' : couldn't malloc...\n");
+        exit(1);
+    }
+    return 0;
+}
+
+void affiche_tab(char **tab){
+    int i = 0;
+    while(tab[i] != NULL){
+        printf("%s ",tab[i]);
+        i++;
+    }
+    printf("\n");
+}
+
+char **get_command_of(char **commande_args, char *x){
+    int size = 0;
+    while(1){
+        char *tmp = commande_args[size];
+        if (tmp == NULL){
+            break;
+        }
+        if(strcmp(tmp,x) == 0){
+            break;
+        }
+        size++;
+    }
+    char **tab = malloc(sizeof(char*) * (size + 1));
+
+    for(int i = 0; i < size; i++){
+        tab[i] = commande_args[i];
+    }
+
+    tab[size] = NULL;
+    return tab;
+}
+    
