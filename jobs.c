@@ -440,6 +440,26 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
             tabPid[i] = fork();
             if(tabPid[i] == 0){
                 if(i == 0){
+                    //Regardons si il y a des redirections 
+                    if(isRedirectionErreur(commands[i].cmd) != -1){
+                        int *fd = getDescriptorOfRedirection(commands[i].cmd);
+                        if(fd[1] != -1){
+                            dup2(fd[1],STDERR_FILENO);
+                        }
+                        commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
+                        free(fd);
+                    }
+
+                    if(isRedirectionEntree(commands[i].cmd)!= -1){
+                        int descripteur_entree = getFichierEntree(commands[i].cmd);
+                        if(descripteur_entree == -1){
+                            dprintf(STDERR_FILENO,"bash: %d: %s.\n", getFichierEntree(commands[i].cmd), strerror(errno));
+                            exit(1);
+                        }
+                        dup2(descripteur_entree,0);
+                        commands[i].cmd = getCommandeWithoutRedirectionEntree(commands[i].cmd);
+                    }
+                    
                     dup2(fd[0][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
                     
                     for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
@@ -465,6 +485,23 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                             close(fd[j][1]);
                         }
 
+                        if(isRedirectionStandart(commands[i].cmd) != -1){
+                            int *fd = getDescriptorOfRedirection(commands[i].cmd);
+                            if(fd[0] != -1){
+                                dup2(fd[0],STDOUT_FILENO);
+                            }
+                            commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
+                            free(fd);
+                        }
+                        if(isRedirectionErreur(commands[i].cmd) != -1){
+                            int *fd = getDescriptorOfRedirection(commands[i].cmd);
+                            if(fd[1] != -1){
+                                dup2(fd[1],STDERR_FILENO);
+                            }
+                            commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
+                            free(fd);
+                        }
+
                         if(isInternalCommand(commands[i].cmd)){
                             status = executeInternalCommand(commands[i].cmd);
                             exit(status);
@@ -473,6 +510,15 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                         exit(EXIT_FAILURE);
                     }
                     else{
+
+                        if(isRedirectionErreur(commands[i].cmd) != -1){
+                            int *fd = getDescriptorOfRedirection(commands[i].cmd);
+                            if(fd[1] != -1){
+                                dup2(fd[1],STDERR_FILENO);
+                            }
+                            commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
+                            free(fd);
+                        }
                         
                         dup2(fd[i-1][0],STDIN_FILENO); //On redirige l'entrée standard vers le pipe
                         dup2(fd[i][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
