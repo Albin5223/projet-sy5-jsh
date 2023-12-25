@@ -132,17 +132,21 @@ int executeJobs(char **commandeArgs){
     int size = len(commandeArgs);
 
     if (size == 1){
-        print_all_jobs();
+        print_all_jobs(false);
         return 0;
     }
     if (size == 2){
+        if(strcmp(commandeArgs[1],"-t")==0){
+            print_all_jobs(true);
+            return 0;
+        }
         int id = atoi(commandeArgs[1]+1);
         if (id == 0){
             dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob], job > 0 \n",pourcentage);
             return -1;
         }
         int pid = get_pid_by_id(id);
-        return print_job_with_pid(pid,1);
+        return print_job_with_pid(pid,false,1);
     }
     dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob] \n",pourcentage);
     return -1;
