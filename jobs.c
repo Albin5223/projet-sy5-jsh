@@ -82,7 +82,7 @@ int print_job_with_pid(int pid, bool printChild,int std){
     for(int i = 0; i < job_count; i++){
         Job tmp = jobs[i];
         if(tmp.pid == pid){
-            print_job(tmp, STDERR_FILENO);
+            print_job(tmp, std);
             if(printChild){
                 printChildOfJob(tmp.pid, std,1);
             }
@@ -637,7 +637,7 @@ int print_all_jobs(bool printChild) {
             dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return -1;
         }
-        print_job_with_pid(jobs[i].pid,printChild,2);
+        print_job_with_pid(jobs[i].pid,printChild,STDOUT_FILENO);   // Print the job in STDOUT
         if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, remove it from the list
             if(remove_job(jobs[i].pid) != 0){
                 return 1;

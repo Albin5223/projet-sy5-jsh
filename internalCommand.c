@@ -26,6 +26,11 @@ void setLastRetrunCode(int n){
     last_return_code = n;
 }
 
+/**
+ * @brief Check if a command is an internal command
+ * @param commands The command to check
+ * @return 1 if the command is an internal command, 0 if not
+*/
 int isInternalCommand(char ** commands){
     if (strcmp(commands[0], EXIT) == 0) return 1;
     if (strcmp(commands[0], CD) == 0) return 1;
@@ -35,7 +40,10 @@ int isInternalCommand(char ** commands){
     return 0;
 }
 
-
+/**
+ * @brief Change the previous directory
+ * @return 0
+*/
 int change_precedent(char *new){
     int size = strlen(new);
     if(precedent != NULL){
@@ -51,6 +59,10 @@ void liberePrecedent(){
     free(precedent);
 }
 
+/**
+ * @brief Execute the cd command
+ * @param commande_args The arguments of the command
+*/
 int execute_cd(char **commande_args){
     int size = 0;
     char *pwd = execute_pwd();
@@ -91,7 +103,10 @@ int execute_cd(char **commande_args){
     return 0;
 }
 
-
+/**
+ * @brief Execute the exit command
+ * @param commande_args The arguments of the command
+*/
 int executeExit(char **commande_args){
     int numberOfJobs = getNbJobs();
     if(numberOfJobs != 0){  // If there are jobs running, we print an error message
@@ -123,15 +138,27 @@ int executeExit(char **commande_args){
     }
 }
 
+/**
+ * @brief Execute the ? command
+ * @return 0
+*/
 int executeLastVal(){
     printf("%d\n",last_return_code);
     return 0;
 }
 
+/**
+ * @brief Execute the jobs command
+ * @param commande_args The arguments of the command
+*/
 int executeJobs(char **commandeArgs){
     return executeinternalJobs(commandeArgs);
 }
 
+/**
+ * @brief Execute the kill command
+ * @param commande_args The arguments of the command
+*/
 int executeKill(char **commande_args){
     if(len(commande_args) == 2){    // if we have command like "kill %1"
         if(start_with_char_then_digits(commande_args[1],'%')){ // if the second argument is an id string (starts with % and contains only digits)
@@ -143,24 +170,31 @@ int executeKill(char **commande_args){
             return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
         }
     }
-
-    //If we have command like "kill pid"
-    if(len(commande_args) == 2 && is_number_strict(commande_args[1])){
+    else if(len(commande_args) == 2 && is_number_strict(commande_args[1])){  // if we have command like "kill pid"
         return kill(atoi(commande_args[1]),SIGTERM);
     }
-
-    //If we have command like "kill -9 pid"
-    if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){
+    else if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){ // if we have command like "kill -9 pid"
         return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
     }
 
+    char pourcentage = '%';
+    dprintf(STDERR_FILENO,"Erreur: kill [-sig] [%cjob] \n",pourcentage);
     return -1;
 }
 
+/**
+ * @brief Get the last return code
+ * @return The last return code
+*/
 int getLastRetrunCode(){
     return last_return_code;
 }
 
+/**
+ * @brief Execute an internal command
+ * @param commande_args The arguments of the command
+ * @return 0 if the command is executed, -1 if not
+*/
 int executeInternalCommand(char **commande_args){
     int fd = -1;
     char buf[2048];
@@ -225,6 +259,7 @@ int executeInternalCommand(char **commande_args){
         return execute_cd(commande_args);
     }
 
+    dprintf(STDERR_FILENO,"Erreur: commande interne non reconnue\n");
     return -1;
 }
 
