@@ -36,6 +36,8 @@ int *getChildOfPid(int pid){
         close(fd);
         return NULL;
     }
+    buffer[size] = '\0';
+
 
     int index = 0;
     const char delim[2] = " ";
@@ -136,7 +138,8 @@ bool hasChild(int pid){
         return false;
     }
     int index = 0;
-    while (children[index] != -1){
+    while (children[index] != -1 && children[index] != 0){
+        
         index++;
     }
     free(children);
@@ -159,13 +162,16 @@ void printChildOfJob(int pid,int std,int indent){
     }
     int *children = getChildOfPid(pid);
     
+    
     int index = 0;
-    while (children[index] != -1){
+    while (children[index] != -1 && children[index] != 0){
         char *info = getInfoOfPid(children[index]);
         printChildWithIndent(info,std,indent);
         free(info);
+        
         if(hasChild(children[index])){
-            printChildOfJob(children[index],std,indent+1);
+            
+            printChildOfJob(*(children+index),std,indent+1);
         }
         index++;
     }
