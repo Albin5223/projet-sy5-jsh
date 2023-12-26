@@ -184,41 +184,35 @@ int executeinternalJobs(char **commandeArgs){
     char pourcentage = '%';
     int size = len(commandeArgs);
 
-    if (size == 1){
+    if (size == 1){ // If there is no argument, we print all the jobs : "jobs"
         print_all_jobs(false);
         return 0;
     }
-    if (size == 2){
-        if(strcmp(commandeArgs[1],"-t")==0){
+    else if (size == 2){    // If there is one argument, we check if it is "-t" or a job id
+        if(strcmp(commandeArgs[1],"-t")==0){    // If it is "-t", we print all the jobs with the children : "jobs -t"
             print_all_jobs(true);
             return 0;
         }
-        if(start_with_char_then_digits(commandeArgs[1],pourcentage)){
+        else if(start_with_char_then_digits(commandeArgs[1],pourcentage)){  // If it is a job id, we print the job : "jobs %1"
             int id = atoi(commandeArgs[1]+1);
-            if (id == 0){
-                dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob], job > 0 \n",pourcentage);
-                return -1;
+            if (id > 0){
+                int pid = get_pid_by_id(id);
+                return print_job_with_pid(pid,false,STDOUT_FILENO);
             }
-            int pid = get_pid_by_id(id);
-            return print_job_with_pid(pid,false,1);
         }
-        return -1;
     }
-    else{
-        if (size == 3){
-            if (strcmp(commandeArgs[1],"-t")==0){
-                if(start_with_char_then_digits(commandeArgs[2],pourcentage)){
-                    int id = atoi(commandeArgs[2]+1);
-                    if (id == 0){
-                        dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob], job > 0 \n",pourcentage);
-                        return -1;
-                    }
+    else if (size == 3){    // If there are two arguments, we check if it is "-t" and a job id : "jobs -t %1"
+        if (strcmp(commandeArgs[1],"-t")==0){
+            if(start_with_char_then_digits(commandeArgs[2],pourcentage)){
+                int id = atoi(commandeArgs[2]+1);
+                if (id > 0){
                     int pid = get_pid_by_id(id);
-                    return print_job_with_pid(pid,true,1);
+                    return print_job_with_pid(pid,true,STDOUT_FILENO);
                 }
             }
         }
     }
+    // If we are here, it means that the command is not valid
     dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob] \n",pourcentage);
     return -1;
 }
