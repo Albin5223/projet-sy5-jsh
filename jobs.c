@@ -13,6 +13,7 @@
 #include "pipe.h"
 #include "redirection.h"
 #include "internalCommand.h"
+#include "jobs-command.h"
 #include "kill.h"
 #include "substitution_process.h"
 
@@ -30,13 +31,8 @@ typedef struct {
     int exit_code; //Ca correcpond à la valeur de retour de la commande 
 } Job;
 
-typedef struct{
-    Job jobFather;
-    int numberChild;
-    Job *child;
-}JobFather;
 
-JobFather jobs[MAX_JOBS];
+Job jobs[MAX_JOBS];
 bool id_taken[MAX_JOBS];
 int job_count = 0;
 
@@ -58,6 +54,22 @@ const char *status_to_string(enum status status){
     }
 }
 
+
+/*
+* Retourne un tableau contenant tous les id des jobs
+* qui doit être free
+*/
+int *getAllId(){
+    int *tab = malloc(sizeof(int)*job_count);
+    for(int i = 0;i<job_count;i++){
+        tab[i] = -1;
+    }
+    for(int i = 0;i<job_count;i++){
+        tab[i] = jobs[i].id;
+    }
+    return tab;
+}
+
 void print_job(Job job, int std){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
@@ -68,13 +80,11 @@ void print_job(Job job, int std){
 
 int print_job_with_pid(int pid, bool printChild,int std){
     for(int i = 0; i < job_count; i++){
-        Job tmp = jobs[i].jobFather;
+        Job tmp = jobs[i];
         if(tmp.pid == pid){
             print_job(tmp, STDERR_FILENO);
             if(printChild){
-                for(int j = 0;j<jobs[i].numberChild;j++){
-                    dprintf(std,"    %d  %s  %s\n",jobs[i].child[j].pid,status_to_string(jobs[i].child[j].status),jobs[i].child[j].cmd);
-                }
+                printChildOfJob(tmp.pid, std,1);
             }
             return 0;
         }
@@ -150,8 +160,8 @@ void free_splited_commands(char ***commands) {
 
 int get_pid_by_id(int id){
     for(int i = 0; i < job_count; i++){
-        if(jobs[i].jobFather.id == id){
-            return jobs[i].jobFather.pid;
+        if(jobs[i].id == id){
+            return jobs[i].pid;
         }
     }
     return -1;
@@ -159,7 +169,7 @@ int get_pid_by_id(int id){
 
 int get_position_with_pid(int pid){
     for(int i = 0; i < job_count; i++){
-        if(jobs[i].jobFather.pid == pid){
+        if(jobs[i].pid == pid){
             return i;
         }
     }
@@ -168,8 +178,8 @@ int get_position_with_pid(int pid){
 
 int get_id_with_pid(int pid){
     for(int i = 0; i < job_count; i++){
-        if(jobs[i].jobFather.pid == pid){
-            return jobs[i].jobFather.id;
+        if(jobs[i].pid == pid){
+            return jobs[i].id;
         }
     }
     return -1;
@@ -184,11 +194,11 @@ enum status update_status(int pid) {
     int result = waitpid(pid, &status, WNOHANG | WUNTRACED | WCONTINUED);
     if (result == 0) {
         // Child is still running
-        if(jobs[get_position_with_pid(pid)].jobFather.status == STOPPED){ // If the job was stopped, return stopped and do not update the status
+        if(jobs[get_position_with_pid(pid)].status == STOPPED){ // If the job was stopped, return stopped and do not update the status
             return STOPPED; 
         }
         else{   // Else, return running and update the status
-            jobs[get_position_with_pid(pid)].jobFather.status = RUNNING;
+            jobs[get_position_with_pid(pid)].status = RUNNING;
             return RUNNING;
         }   
     }
@@ -199,27 +209,27 @@ enum status update_status(int pid) {
     else {
         // Child is done
         if (WIFEXITED(status)) {
-            jobs[get_position_with_pid(pid)].jobFather.status = DONE;
-            jobs[get_position_with_pid(pid)].jobFather.exit_code = WEXITSTATUS(status); // Store the exit status
+            jobs[get_position_with_pid(pid)].status = DONE;
+            jobs[get_position_with_pid(pid)].exit_code = WEXITSTATUS(status); // Store the exit status
             return DONE;
         }
         else if (WIFSIGNALED(status)) {
-            jobs[get_position_with_pid(pid)].jobFather.status = KILLED;
-            jobs[get_position_with_pid(pid)].jobFather.exit_code = WTERMSIG(status); // Store the termination signal
+            jobs[get_position_with_pid(pid)].status = KILLED;
+            jobs[get_position_with_pid(pid)].exit_code = WTERMSIG(status); // Store the termination signal
             return KILLED;
         }
         else if (WIFSTOPPED(status)) {
-            jobs[get_position_with_pid(pid)].jobFather.status = STOPPED;
-            jobs[get_position_with_pid(pid)].jobFather.exit_code = WSTOPSIG(status); // Store the termination signal
+            jobs[get_position_with_pid(pid)].status = STOPPED;
+            jobs[get_position_with_pid(pid)].exit_code = WSTOPSIG(status); // Store the termination signal
             return STOPPED;
         }
         else if (WIFCONTINUED(status)) {
-            jobs[get_position_with_pid(pid)].jobFather.status = RUNNING;
+            jobs[get_position_with_pid(pid)].status = RUNNING;
             print_job_with_pid(pid,false,2);
             return RUNNING;
         }
         else {
-            jobs[get_position_with_pid(pid)].jobFather.status = RUNNING;
+            jobs[get_position_with_pid(pid)].status = RUNNING;
             return RUNNING;
         }
     }
@@ -241,20 +251,18 @@ int set_first_free_id() {
 }
 
 int add_to_tab_of_jobs(int pid, char **commande_args){
-    jobs[job_count].numberChild= -1;
-    
-    jobs[job_count].jobFather.cmd[0] = '\0'; // Start with an empty string
+    jobs[job_count].cmd[0] = '\0'; // Start with an empty string
     for (int i = 0; commande_args[i] != NULL; i++) {
         if (i > 0) {
-            strcat(jobs[job_count].jobFather.cmd, " "); // Add a space before each argument after the first
+            strcat(jobs[job_count].cmd, " "); // Add a space before each argument after the first
         }
-        strcat(jobs[job_count].jobFather.cmd, commande_args[i]);
+        strcat(jobs[job_count].cmd, commande_args[i]);
     }
     
     job_count++;
-    jobs[job_count-1].jobFather.status = RUNNING;
-    jobs[job_count-1].jobFather.pid = pid;
-    jobs[job_count-1].jobFather.id = set_first_free_id();
+    jobs[job_count-1].status = RUNNING;
+    jobs[job_count-1].pid = pid;
+    jobs[job_count-1].id = set_first_free_id();
     return 0;
 }
 
@@ -351,16 +359,16 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
         if (!is_background) { // If the command is not run in the background
             while (1){
                 update_status(pid);
-                if(jobs[get_position_with_pid(pid)].jobFather.status == DONE || jobs[get_position_with_pid(pid)].jobFather.status == KILLED){
-                    int exit_code = jobs[get_position_with_pid(pid)].jobFather.exit_code; // Get the exit code of the job
+                if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
+                    int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
                     remove_job(pid);
                     return exit_code;
                 }
-                else if(jobs[get_position_with_pid(pid)].jobFather.status == STOPPED){
+                else if(jobs[get_position_with_pid(pid)].status == STOPPED){
                     print_job_with_pid(pid, false,STDERR_FILENO);
                     return 0;
                 }
-                else if(jobs[get_position_with_pid(pid)].jobFather.status == RUNNING){
+                else if(jobs[get_position_with_pid(pid)].status == RUNNING){
                     continue;
                 }
                 else{
@@ -377,69 +385,16 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
 }
 
 
-int add_child_of_jobs(int pidFather,int pidChild,char **commande_args){
-    for(int i = 0;i<job_count;i++){
-        if (jobs[i].jobFather.pid == pidFather){
-            if (jobs[i].numberChild == -1){
-                jobs[i].child = malloc(sizeof(Job)*MAX_CHILD);
-                jobs[i].numberChild = 0;
-                jobs[i].child[jobs[i].numberChild].pid = pidChild;
-                jobs[i].child[jobs[i].numberChild].id = jobs[i].numberChild;
-                jobs[i].child[jobs[i].numberChild].status = RUNNING;
-                jobs[i].child[jobs[i].numberChild].exit_code = -1;
-                int index = 0;
-                for (int j = 0;j<len(commande_args);j++){
-                    for(int k = 0;k<strlen(commande_args[j]);k++){
-                        jobs[i].child[jobs[i].numberChild].cmd[index] = commande_args[j][k];
-                        index ++;
-                    }
-                    jobs[i].child[jobs[i].numberChild].cmd[index] = ' ';
-                    index ++;
-                }
-                jobs[i].child[jobs[i].numberChild].cmd[index - 1] = '\0';
-                jobs[i].numberChild ++;
-
-            }
-            else{
-                jobs[i].child[jobs[i].numberChild].pid = pidChild;
-                jobs[i].child[jobs[i].numberChild].id = jobs[i].numberChild;
-                jobs[i].child[jobs[i].numberChild].status = RUNNING;
-                jobs[i].child[jobs[i].numberChild].exit_code = -1;
-                int index = 0;
-                for (int j = 0;j<len(commande_args);j++){
-                    for(int k = 0;k<strlen(commande_args[j]);k++){
-                        jobs[i].child[jobs[i].numberChild].cmd[index] = commande_args[j][k];
-                        index ++;
-                    }
-                    jobs[i].child[jobs[i].numberChild].cmd[index] = ' ';
-                    index ++;
-                }
-                jobs[i].child[jobs[i].numberChild].cmd[index - 1] = '\0';
-                jobs[i].numberChild ++;
-            }
-        }
-    }
-
-    return 0;
-}
-
 int add_job_command_with_pipe(char **commande_args, bool is_background){
     int nbPipe = numberOfPipes(commande_args);
     int fd[nbPipe][2];
-
-
-    int pipePid[2];
-    int confirmation[2];
 
 
     Command *commands = split_commands_for_jobs(commande_args,"|");
     int numberCommand = nbPipe + 1;
     int tabPid[numberCommand];
     int status;
-    
 
-    pipe(pipePid);
-    pipe(confirmation);
 
     int pid = fork();
     if(pid == 0){
@@ -559,16 +514,6 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
             close(fd[i][1]);
         }
 
-        //Envoyer tous les pids son pere
-        for(int i = 0; i<numberCommand;i++){
-            char pid[20];
-            char confirmation[20];
-            sprintf(pid,"%d",tabPid[i]);
-            write(pipePid[1],pid,20);
-
-            read(confirmation[0],confirmation,20);
-            
-        }
         for(int i = 0;i<numberCommand;i++){ //On attend que tous les fils se terminent
             waitpid(tabPid[i], &status, 0);
         }
@@ -579,29 +524,21 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
         if(add_to_tab_of_jobs(pid, commande_args) != 0){    // If the job could not be added, return 1
             return 1;
         }
-        for(int i = 0;i<numberCommand;i++){
-            char pidMessage[20];
-            read(pipePid[0],pidMessage,20);
-            int pidChild = atoi(pidMessage);
-            add_child_of_jobs(pid,pidChild,commands[i].cmd);
-
-            write(confirmation[1],pidMessage,20);
-        }
 
 
         if (!is_background) { // If the command is not run in the background
             while (1){
                 update_status(pid);
-                if(jobs[get_position_with_pid(pid)].jobFather.status == DONE || jobs[get_position_with_pid(pid)].jobFather.status == KILLED){
-                    int exit_code = jobs[get_position_with_pid(pid)].jobFather.exit_code; // Get the exit code of the job
+                if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
+                    int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
                     remove_job(pid);
                     return exit_code;
                 }
-                else if(jobs[get_position_with_pid(pid)].jobFather.status == STOPPED){
+                else if(jobs[get_position_with_pid(pid)].status == STOPPED){
                     print_job_with_pid(pid,false, STDERR_FILENO);
                     return 0;
                 }
-                else if(jobs[get_position_with_pid(pid)].jobFather.status == RUNNING){
+                else if(jobs[get_position_with_pid(pid)].status == RUNNING){
                     continue;
                 }
                 else{
@@ -669,22 +606,15 @@ int add_job(char **commande_args) {
 */
 int remove_job(int pid) {
     for (int i = 0; i < job_count; i++) {
-        if (jobs[i].jobFather.pid == pid) {
-            id_taken[jobs[i].jobFather.id] = false;
-            jobs[i].jobFather.cmd[0] = '\0';
+        if (jobs[i].pid == pid) {
+            id_taken[jobs[i].id] = false;
+            jobs[i].cmd[0] = '\0';
 
-            //Free child
-            if(jobs[i].numberChild != -1){
-                for(int j = 0;j<jobs[i].numberChild;j++){
-                    jobs[i].child[j].cmd[0] = '\0';
-                }
-                free(jobs[i].child);
-            }
-            jobs[i].jobFather.pid = -1;
-            jobs[i].jobFather.id = -1;
-            jobs[i].jobFather.status = -1;
-            jobs[i].jobFather.exit_code = -1;
-            jobs[i].numberChild = -1;
+            
+            jobs[i].pid = -1;
+            jobs[i].id = -1;
+            jobs[i].status = -1;
+            jobs[i].exit_code = -1;
             // Shift all elements down to fill the gap
             for (int j = i; j < job_count - 1; j++) {
                 jobs[j] = jobs[j + 1];
@@ -703,13 +633,13 @@ int remove_job(int pid) {
 int print_all_jobs(bool printChild) {
     int i = 0;
     while (i < job_count){
-        if(update_status(jobs[i].jobFather.pid) == -1){
-            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].jobFather.id);
+        if(update_status(jobs[i].pid) == -1){
+            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return -1;
         }
-        print_job_with_pid(jobs[i].jobFather.pid,printChild,2);
-        if(jobs[i].jobFather.status == DONE || jobs[i].jobFather.status == KILLED){  // If the job has exited, or killed, remove it from the list
-            if(remove_job(jobs[i].jobFather.pid) != 0){
+        print_job_with_pid(jobs[i].pid,printChild,2);
+        if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, remove it from the list
+            if(remove_job(jobs[i].pid) != 0){
                 return 1;
             }
         }
@@ -726,13 +656,13 @@ int print_all_jobs(bool printChild) {
 void verify_done_jobs() {
     int i = 0;
     while (i < job_count){
-        if(update_status(jobs[i].jobFather.pid) == -1){
-            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].jobFather.id);
+        if(update_status(jobs[i].pid) == -1){
+            dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return;
         }
-        if(jobs[i].jobFather.status == DONE || jobs[i].jobFather.status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
-            print_job(jobs[i].jobFather, STDERR_FILENO);
-            remove_job(jobs[i].jobFather.pid);    // Do not increment i, since the next job will have the same index
+        if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
+            print_job(jobs[i], STDERR_FILENO);
+            remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
         else{   // If the job is still running, increment i
             i++;

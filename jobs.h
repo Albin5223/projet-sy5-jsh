@@ -10,6 +10,7 @@
 enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED};
 
 int get_pid_by_id(int id);
+int *getAllId();
 int add_job(char **commande_args);
 int remove_job(int pid);
 int print_all_jobs(bool printChild);
