@@ -70,6 +70,11 @@ int *getAllId(){
     return tab;
 }
 
+/**
+ * @brief prints a job
+ * @param job The job to print
+ * @param std The standard output to print to
+*/
 void print_job(Job job, int std){
     char *job_id = malloc(number_length(job.id) + 2 + 1);   // 2 brackets + null terminator
     snprintf(job_id, number_length(job.id) + 2 + 1, "[%d]", job.id);
@@ -78,7 +83,14 @@ void print_job(Job job, int std){
     free(job_id);
 }
 
-int print_job_with_pid(int pid, bool printChild,int std){
+/**
+ * @brief Print the job with the given pid
+ * @param pid The pid of the job to print
+ * @param printChild If true, print the child processes of the job
+ * @param std The standard output to print to
+ * @return 0 if the job was found, 1 otherwise
+*/
+int print_job_with_pid(int pid, bool printChild, int std){
     for(int i = 0; i < job_count; i++){
         Job tmp = jobs[i];
         if(tmp.pid == pid){
@@ -89,7 +101,7 @@ int print_job_with_pid(int pid, bool printChild,int std){
             return 0;
         }
     }
-    dprintf(2,"Error: job with pid %d not found.\n",pid);
+    dprintf(STDERR_FILENO,"Error: job with pid %d not found.\n",pid);
     return 1;
 }
 
@@ -150,7 +162,10 @@ Command *split_commands_for_jobs(char **commande_args,const char *delim) {
     return commands;
 }
 
-
+/**
+ * @brief Free the memory allocated for the given array of commands
+ * @param commands The array of commands to free
+*/
 void free_splited_commands(char ***commands) {
     for (int i = 0; commands[i] != NULL; i++) {
         free(commands[i]);
@@ -158,6 +173,10 @@ void free_splited_commands(char ***commands) {
     free(commands);
 }
 
+/**
+ * @brief get the job with the given id
+ * @param id The id of the job to get
+*/
 int get_pid_by_id(int id){
     for(int i = 0; i < job_count; i++){
         if(jobs[i].id == id){
@@ -167,6 +186,10 @@ int get_pid_by_id(int id){
     return -1;
 }
 
+/**
+ * @brief Get the position (in the tab) of the job with the given pid
+ * @param pid The pid of the job
+*/
 int get_position_with_pid(int pid){
     for(int i = 0; i < job_count; i++){
         if(jobs[i].pid == pid){
@@ -176,6 +199,10 @@ int get_position_with_pid(int pid){
     return -1;
 }
 
+/**
+ * @brief Get the id of the job with the given pid
+ * @param pid The pid of the job
+*/
 int get_id_with_pid(int pid){
     for(int i = 0; i < job_count; i++){
         if(jobs[i].pid == pid){
@@ -188,6 +215,7 @@ int get_id_with_pid(int pid){
 /**
  * @brief Update the status of the job with the given pid
  * @param pid The pid of the job
+ * @return The status of the job
 */
 enum status update_status(int pid) {
     int status;
@@ -250,7 +278,12 @@ int set_first_free_id() {
     return -1;
 }
 
-int add_to_tab_of_jobs(int pid, char **commande_args){
+/**
+ * @brief Add the job with the given pid and command to the list of jobs
+ * @param pid The pid of the job
+ * @param commande_args The command of the job
+*/
+void add_to_tab_of_jobs(int pid, char **commande_args){
     jobs[job_count].cmd[0] = '\0'; // Start with an empty string
     for (int i = 0; commande_args[i] != NULL; i++) {
         if (i > 0) {
@@ -263,12 +296,35 @@ int add_to_tab_of_jobs(int pid, char **commande_args){
     jobs[job_count-1].status = RUNNING;
     jobs[job_count-1].pid = pid;
     jobs[job_count-1].id = set_first_free_id();
-    return 0;
 }
 
+int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background){
+    add_to_tab_of_jobs(child_pid, commande_args);
 
-void affiche(int sig){
-    printf("J'ai recu %d ",sig);
+    if (!is_background) { // If the command is not run in the background
+        while (1){
+            update_status(child_pid);
+            if(jobs[get_position_with_pid(child_pid)].status == DONE || jobs[get_position_with_pid(child_pid)].status == KILLED){
+                int exit_code = jobs[get_position_with_pid(child_pid)].exit_code; // Get the exit code of the job
+                remove_job(child_pid);
+                return exit_code;
+            }
+            else if(jobs[get_position_with_pid(child_pid)].status == STOPPED){
+                print_job_with_pid(child_pid, false,STDERR_FILENO);
+                return 0;
+            }
+            else if(jobs[get_position_with_pid(child_pid)].status == RUNNING){
+                continue;
+            }
+            else{
+                dprintf(STDERR_FILENO,"Error: unknown status.\n");
+                return 1;
+            }
+        }
+    }
+    else{
+        return print_job_with_pid(child_pid, false, STDERR_FILENO);
+    }      
 }
 
 int add_job_command_without_pipe(char **commande_args, bool is_background) {
@@ -351,35 +407,7 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
         exit(1);
     }
     else {  // Parent process
-
-        if(add_to_tab_of_jobs(pid, commande_args) != 0){    // If the job could not be added, return 1
-            return 1;
-        }
-
-        if (!is_background) { // If the command is not run in the background
-            while (1){
-                update_status(pid);
-                if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
-                    int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
-                    remove_job(pid);
-                    return exit_code;
-                }
-                else if(jobs[get_position_with_pid(pid)].status == STOPPED){
-                    print_job_with_pid(pid, false,STDERR_FILENO);
-                    return 0;
-                }
-                else if(jobs[get_position_with_pid(pid)].status == RUNNING){
-                    continue;
-                }
-                else{
-                    dprintf(STDERR_FILENO,"Error: unknown status.\n");
-                    return 1;
-                }
-            }
-        }
-        else{
-            return print_job_with_pid(pid, false, STDERR_FILENO);
-        }      
+        return executeFatherWork(pid, commande_args, is_background);
     }
     return 0;
 }
@@ -521,74 +549,41 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
         
     }
     else{
-        if(add_to_tab_of_jobs(pid, commande_args) != 0){    // If the job could not be added, return 1
-            return 1;
-        }
-
-
-        if (!is_background) { // If the command is not run in the background
-            while (1){
-                update_status(pid);
-                if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
-                    int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
-                    remove_job(pid);
-                    return exit_code;
-                }
-                else if(jobs[get_position_with_pid(pid)].status == STOPPED){
-                    print_job_with_pid(pid,false, STDERR_FILENO);
-                    return 0;
-                }
-                else if(jobs[get_position_with_pid(pid)].status == RUNNING){
-                    continue;
-                }
-                else{
-                    dprintf(STDERR_FILENO,"Error: unknown status.\n");
-                    return 1;
-                }
-            }
-        }
-        else{
-            return print_job_with_pid(pid, false, STDERR_FILENO);
-        }      
+        return executeFatherWork(pid, commande_args, is_background);
     }
     return 0;
 }
 
 
-
-int add_job(char **commande_args) {
-    Command *commands = split_commands_for_jobs(commande_args,"&");
+/**
+ * @brief Execute the given command (internal or external)
+ * @param commande_args The all command
+*/
+int execute_commande(char **commande_args) {
+    Command *commands = split_commands_for_jobs(commande_args,"&"); // Split the command into multiple subcommands (separated by &)
     int status;
-    for (int i = 0; commands[i].cmd[0] != NULL; i++) {
-        if(!isPipe(commands[i].cmd)){
+    for (int i = 0; commands[i].cmd[0] != NULL; i++) {  // Execute each subcommand
+        if(!isPipe(commands[i].cmd)){   // If the command does not have a pipe, execute it without pipe
             status = add_job_command_without_pipe(commands[i].cmd, commands[i].is_background);
-            if (status != 0) {
-                int j = 0;
-                for(int i = 0; commands[i].cmd[0] != NULL; i++){
-                    free(commands[i].cmd);
-                    j++;
-                }
-                free(commands[j].cmd);
-                free(commands);
-                return status;
-            }
         }
-        else{
+        else{   // Else, execute it with pipe
             status = add_job_command_with_pipe(commands[i].cmd, commands[i].is_background);
-            if (status != 0) {
-                int j = 0;
-                for(int i = 0; commands[i].cmd[0] != NULL; i++){
-                    free(commands[i].cmd);
-                    j++;
-                }
-                free(commands[j].cmd);
-                free(commands);
-                return status;
+        }
+
+        if (status != 0) {  // If the command failed, free the memory and return the status
+            int j = 0;
+            for(int i = 0; commands[i].cmd[0] != NULL; i++){
+                free(commands[i].cmd);
+                j++;
             }
+            free(commands[j].cmd);
+            free(commands);
+            return status;
         }
         
     }
 
+    // Free the memory
     int j = 0;
     for(int i = 0; commands[i].cmd[0] != NULL; i++){
         free(commands[i].cmd);
@@ -629,6 +624,8 @@ int remove_job(int pid) {
 
 /**
  * @brief Print the list of jobs
+ * @param printChild If true, print the child processes of the jobs
+ * @return 1 if there was an error, 0 otherwise
 */
 int print_all_jobs(bool printChild) {
     int i = 0;
@@ -675,10 +672,4 @@ void verify_done_jobs() {
 */
 int getNbJobs() {
     return job_count;
-}
-
-
-//-----> modifier le pipe
-int execute_commande(char **commande_args){
-    return add_job(commande_args);
 }
