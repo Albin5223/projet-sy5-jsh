@@ -200,7 +200,17 @@ int executeinternalJobs(char **commandeArgs){
     }
     else{
         if (size == 3){
-
+            if (strcmp(commandeArgs[1],"-t")==0){
+                if(start_with_char_then_digits(commandeArgs[2],pourcentage)){
+                    int id = atoi(commandeArgs[2]+1);
+                    if (id == 0){
+                        dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob], job > 0 \n",pourcentage);
+                        return -1;
+                    }
+                    int pid = get_pid_by_id(id);
+                    return print_job_with_pid(pid,true,1);
+                }
+            }
         }
     }
     dprintf(STDERR_FILENO,"Erreur: jobs [-t] [%cjob] \n",pourcentage);
