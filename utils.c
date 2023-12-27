@@ -265,7 +265,7 @@ void ignore_all_signals() {
 
     sa.sa_handler = SIG_IGN;
     
-    // Ignore all signals except SIGKILL and SIGSTOP
+    // Ignore all signals except SIGKILL and SIGSTOP and SIGCHLD
     for (int i = 1; i < NSIG; i++) {
         if (i != SIGKILL && i != SIGSTOP && i != SIGCHLD) {
             sigaction(i, &sa, NULL);
@@ -282,4 +282,23 @@ void dont_ignore_all_signals() {
     for (int i = 1; i < NSIG; i++) {
         sigaction(i, &sa, NULL);
     }
+}
+
+pid_t other_pid;
+
+void signal_handler(int sig) {
+    kill(other_pid, sig);
+}
+
+void redirect_signals_to(pid_t pid){
+    other_pid = pid;
+    struct sigaction sa = {0};
+    sa.sa_handler = signal_handler;
+    // Ignore all signals except SIGKILL and SIGSTOP and SIGCHLD
+    for (int i = 1; i < NSIG; i++) {
+        if (i != SIGKILL && i != SIGSTOP && i != SIGCHLD) {
+            sigaction(i, &sa, NULL);
+        }
+    }
+
 }

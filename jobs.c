@@ -302,6 +302,9 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
     add_to_tab_of_jobs(child_pid, commande_args);
 
     if (!is_background) { // If the command is not run in the background
+
+        redirect_signals_to(child_pid); // Redirect the signals to the child process
+
         while (1){
             update_status(child_pid);
             if(jobs[get_position_with_pid(child_pid)].status == DONE || jobs[get_position_with_pid(child_pid)].status == KILLED){

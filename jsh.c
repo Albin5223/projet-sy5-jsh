@@ -78,6 +78,7 @@ int main(int argc, char const *argv[]){
 
     while(1){
 
+        dont_ignore_all_signals(); // We don't ignore all the signals anymore
         ignore_all_signals(); // We ignore all the signals
         char *path = path_shell("$ ", green, blue);
         

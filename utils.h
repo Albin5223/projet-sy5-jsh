@@ -23,6 +23,7 @@ char **get_command_of(char **commande_args, char *x);
 void affiche_tab(char **tab);
 void ignore_all_signals();
 void dont_ignore_all_signals();
+void redirect_signals_to(pid_t pid);
 
 
 #endif
