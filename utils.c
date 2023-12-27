@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <signal.h>
 
 
 /**
@@ -258,3 +259,27 @@ char **get_command_of(char **commande_args, char *x){
     return tab;
 }
     
+
+void ignore_all_signals() {
+    struct sigaction sa = {0};
+
+    sa.sa_handler = SIG_IGN;
+    
+    // Ignore all signals except SIGKILL and SIGSTOP
+    for (int i = 1; i < NSIG; i++) {
+        if (i != SIGKILL && i != SIGSTOP && i != SIGCHLD) {
+            sigaction(i, &sa, NULL);
+        }
+    }
+}
+
+void dont_ignore_all_signals() {
+    struct sigaction sa = {0};
+
+    sa.sa_handler = SIG_DFL;
+    
+    // Ignore all signals
+    for (int i = 1; i < NSIG; i++) {
+        sigaction(i, &sa, NULL);
+    }
+}

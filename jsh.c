@@ -78,6 +78,7 @@ int main(int argc, char const *argv[]){
 
     while(1){
 
+        ignore_all_signals(); // We ignore all the signals
         char *path = path_shell("$ ", green, blue);
         
         input = readline(path);
@@ -86,6 +87,8 @@ int main(int argc, char const *argv[]){
             exit(getLastRetrunCode());
         }
         free(path);
+
+        dont_ignore_all_signals(); // We don't ignore all the signals anymore
 
         remove_last_spaces(&input); // Removing the last spaces only after verifying that the input is not empty
         if(strlen(input) == 0){    // If the input is empty after removing the last spaces, we continue
