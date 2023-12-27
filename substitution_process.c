@@ -122,7 +122,7 @@ int execute_substitution_process(char **command_args, int nb_subs){
             close(fd_tmp);
 
             if (isInternalCommand(tab[i]) == 1){
-                ret = execute_internal_command(tab[i]);
+                ret = executeInternalCommand(tab[i]);
                 exit(ret);
             }
 
@@ -195,8 +195,9 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
     if (fork() == 0) {
         if (isInternalCommand(main_command) == 1){
-            ret = execute_internal_command(main_command);
+            ret = executeInternalCommand(main_command);
         } else {
+            puts("main_command");
             execvp(main_command[0], main_command);
             goto error;
         }
