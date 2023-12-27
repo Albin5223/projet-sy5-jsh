@@ -438,15 +438,6 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
             tabPid[i] = fork();
             if(tabPid[i] == 0){
                 if(i == 0){
-                    //Regardons si il y a des redirections 
-                    if(isRedirectionErreur(commands[i].cmd) != -1){
-                        int *fd = getDescriptorOfRedirection(commands[i].cmd);
-                        if(fd[1] != -1){
-                            dup2(fd[1],STDERR_FILENO);
-                        }
-                        commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
-                        free(fd);
-                    }
 
                     if(isRedirectionEntree(commands[i].cmd)!= -1){
                         int descripteur_entree = getFichierEntree(commands[i].cmd);
@@ -457,6 +448,18 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
                         dup2(descripteur_entree,0);
                         commands[i].cmd = getCommandeWithoutRedirectionEntree(commands[i].cmd);
                     }
+
+                    //Regardons si il y a des redirections 
+                    if(isRedirectionErreur(commands[i].cmd) != -1){
+                        int *fd = getDescriptorOfRedirection(commands[i].cmd);
+                        if(fd[1] != -1){
+                            dup2(fd[1],STDERR_FILENO);
+                        }
+                        commands[i].cmd = getCommandeOfRedirection(commands[i].cmd);
+                        free(fd);
+                    }
+
+                    
                     
                     dup2(fd[0][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
                     
@@ -549,6 +552,13 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
         
     }
     else{
+        int j =0;
+        for(int i = 0; commands[i].cmd[0] != NULL; i++){
+            free(commands[i].cmd);
+            j++;
+        }
+        free(commands[j].cmd);
+        free(commands);
         return executeFatherWork(pid, commande_args, is_background);
     }
     return 0;

@@ -68,8 +68,17 @@ char *convertSymboleOfState(char *c){
     if(strcmp(c,"T") == 0){
         return "Stopped";
     }
+    if(strcmp(c,"t") == 0){
+        return "Tracing";
+    }
+    if(strcmp(c,"X")){
+        return "Done";
+    }
+    if(strcmp(c,"K")){
+        return "Killed";
+    }
     return "Unknown";
-}
+}   
 
 char *getInfoOfPid(int pid){
     char path[100];
