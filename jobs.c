@@ -113,7 +113,7 @@ int print_job_with_pid(int pid, bool printChild, int std){
 Command *split_commands_for_jobs(char **commande_args,const char *delim) {
     // Count the number of delimit symbols
     int command_count = 0;  // Start from 1 to account for the first command
-    bool last_was_ampersand = false;
+    bool last_was_ampersand = false;        // ampersand = &
     for (int i = 0; commande_args[i] != NULL; i++) {
         if (strcmp(commande_args[i], delim) == 0) {
             command_count++;
@@ -365,7 +365,6 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
         */
 
        if(isRedirectionEntree(commande_args)!= -1){
-           
             descripteur_entree = getFichierEntree(commande_args);
             if(descripteur_entree == -1){
                 dprintf(STDERR_FILENO,"bash: %d: %s.\n", getFichierEntree(commande_args), strerror(errno));
