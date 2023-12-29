@@ -264,10 +264,9 @@ void ignore_all_signals() {
     struct sigaction sa = {0};
 
     sa.sa_handler = SIG_IGN;
-    
     // Ignore all signals except SIGKILL and SIGSTOP and SIGCHLD
     for (int i = 1; i < NSIG; i++) {
-        if (i != SIGKILL && i != SIGSTOP && i != SIGCHLD) {
+        if(i == SIGINT || i == SIGTERM || i == SIGTTIN || i == SIGQUIT || i == SIGTTOU || i == SIGTSTP){
             sigaction(i, &sa, NULL);
         }
     }

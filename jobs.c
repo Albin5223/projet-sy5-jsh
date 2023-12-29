@@ -302,12 +302,18 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
     add_to_tab_of_jobs(child_pid, commande_args);
 
     if (!is_background) { // If the command is not run in the background
-
+        if(!isInternalCommand(commande_args)){
+            tcsetpgrp(STDIN_FILENO, getpgrp()); // Set the terminal's foreground process group to the child process
+        }
+            
         redirect_signals_to(child_pid); // Redirect the signals to the child process
 
         while (1){
             update_status(child_pid);
             if(jobs[get_position_with_pid(child_pid)].status == DONE || jobs[get_position_with_pid(child_pid)].status == KILLED){
+                tcsetpgrp(STDIN_FILENO, getpid()); // Set the terminal's foreground process group to the shell
+                tcsetpgrp(STDOUT_FILENO, getpid()); // Set the terminal's foreground process group to the shell
+                tcsetpgrp(STDERR_FILENO, getpid()); // Set the terminal's foreground process group to the shells
                 int exit_code = jobs[get_position_with_pid(child_pid)].exit_code; // Get the exit code of the job
                 remove_job(child_pid);
                 return exit_code;
@@ -330,6 +336,7 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
     }      
 }
 
+
 int add_job_command_without_pipe(char **commande_args, bool is_background) {
     int value; //Variable qui va stocker la valeur de retour de la commande interne
     if(isInternalCommand(commande_args) && !is_background){
@@ -339,6 +346,9 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
     if (nb_subs(commande_args) > 0) {
         value = execute_substitution_process(commande_args, nb_subs(commande_args));
     }
+
+    struct sigaction ignore = {0};
+    ignore.sa_handler = SIG_IGN;
     
 
     pid_t pid = fork();
@@ -349,6 +359,13 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
         }
 
         setpgid(0, 0); // Set the process group ID to the process ID
+        if(!is_background){
+            sigaction(SIGTTOU, &ignore, NULL); // Ignore SIGINT
+            tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+
+            
+
+        }
         
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
