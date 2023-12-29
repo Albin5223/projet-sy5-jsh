@@ -196,6 +196,23 @@ int excecuteFG(char **command_args){
     return -1;
 }
 
+
+int executeBG(char **command_args){
+    if(len(command_args) == 2){
+        if(start_with_char_then_digits(command_args[1],'%')){
+            int id = atoi(command_args[1]+1);
+
+            if(get_pid_by_id(id) == -1){
+                dprintf(STDERR_FILENO,"Erreur: le job %d n'existe pas\n",id);
+                return -1;
+            }
+            return send_signal_to_id(id,SIGCONT);
+        }
+    }
+
+    return -1;
+}
+
 /**
  * @brief Get the last return code
  * @return The last return code
@@ -274,6 +291,9 @@ int executeInternalCommand(char **commande_args){
     }
     if(strcmp(commande_args[0],"fg") == 0){
         return excecuteFG(commande_args);
+    }
+    if(strcmp(commande_args[0],"bg") == 0){
+        return executeBG(commande_args);
     }
 
     dprintf(STDERR_FILENO,"Erreur: commande interne non reconnue\n");
