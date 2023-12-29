@@ -5,6 +5,8 @@
 #define LAST "?"
 #define JOBS "jobs"
 #define KILL "kill"
+#define BG "bg"
+#define FG "fg"
 
 int getLastRetrunCode();
 int executeInternalCommand(char **commande_args);

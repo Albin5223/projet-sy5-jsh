@@ -186,6 +186,7 @@ int get_pid_by_id(int id){
     return -1;
 }
 
+
 /**
  * @brief Get the position (in the tab) of the job with the given pid
  * @param pid The pid of the job
@@ -198,6 +199,60 @@ int get_position_with_pid(int pid){
     }
     return -1;
 }
+
+
+int fg_id(int id){
+    int pid = get_pid_by_id(id);
+    if(pid == -1){
+        dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",id);
+        return 1;
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+
+    // Child is done
+    if (WIFEXITED(status)) {
+        jobs[get_position_with_pid(pid)].status = DONE;
+        jobs[get_position_with_pid(pid)].exit_code = WEXITSTATUS(status); // Store the exit statusZ
+    }
+    else if (WIFSIGNALED(status)) {
+        jobs[get_position_with_pid(pid)].status = KILLED;
+        jobs[get_position_with_pid(pid)].exit_code = WTERMSIG(status); // Store the termination signal  
+    }
+    else if (WIFSTOPPED(status)) {
+        jobs[get_position_with_pid(pid)].status = STOPPED;
+        jobs[get_position_with_pid(pid)].exit_code = WSTOPSIG(status); // Store the termination signal
+        
+    }
+    else if (WIFCONTINUED(status)) {
+        jobs[get_position_with_pid(pid)].status = RUNNING;
+        print_job_with_pid(pid,false,2);
+        
+    }
+    else {
+        jobs[get_position_with_pid(pid)].status = RUNNING; 
+    }
+
+    if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
+        print_job_with_pid(pid, false,STDERR_FILENO);
+        int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
+        remove_job(pid);
+        return exit_code;
+    }
+    else if(jobs[get_position_with_pid(pid)].status == STOPPED){
+        print_job_with_pid(pid, false,STDERR_FILENO);
+        return 0;
+    }
+    else{
+        dprintf(STDERR_FILENO,"Error: unknown status.\n");
+        return 1;
+    }
+
+    return status;
+}
+
+
 
 /**
  * @brief Get the id of the job with the given pid
@@ -302,12 +357,14 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
     add_to_tab_of_jobs(child_pid, commande_args);
 
     if (!is_background) { // If the command is not run in the background
-
+        
+            
         redirect_signals_to(child_pid); // Redirect the signals to the child process
 
         while (1){
             update_status(child_pid);
             if(jobs[get_position_with_pid(child_pid)].status == DONE || jobs[get_position_with_pid(child_pid)].status == KILLED){
+                
                 int exit_code = jobs[get_position_with_pid(child_pid)].exit_code; // Get the exit code of the job
                 remove_job(child_pid);
                 return exit_code;
@@ -330,6 +387,7 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
     }      
 }
 
+
 int add_job_command_without_pipe(char **commande_args, bool is_background) {
     int value; //Variable qui va stocker la valeur de retour de la commande interne
     if(isInternalCommand(commande_args) && !is_background){
@@ -339,7 +397,11 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
     if (nb_subs(commande_args) > 0) {
         value = execute_substitution_process(commande_args, nb_subs(commande_args));
     }
-    
+
+    /*
+    struct sigaction ignore = {0};
+    ignore.sa_handler = SIG_IGN;
+    */
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
@@ -349,6 +411,13 @@ int add_job_command_without_pipe(char **commande_args, bool is_background) {
         }
 
         setpgid(0, 0); // Set the process group ID to the process ID
+        /*
+        if(!is_background){
+            sigaction(SIGTTOU, &ignore, NULL); // Ignore SIGINT
+            tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+
+        }
+        */
         
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
