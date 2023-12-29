@@ -299,5 +299,4 @@ void redirect_signals_to(pid_t pid){
             sigaction(i, &sa, NULL);
         }
     }
-
 }

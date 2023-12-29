@@ -37,6 +37,8 @@ int isInternalCommand(char ** commands){
     if (strcmp(commands[0], LAST) == 0) return 1;
     if (strcmp(commands[0], JOBS) == 0) return 1;
     if (strcmp(commands[0], KILL) == 0) return 1;
+    if (strcmp(commands[0], FG) == 0) return 1;
+    if (strcmp(commands[0], BG) == 0) return 1;
     return 0;
 }
 
@@ -182,6 +184,18 @@ int executeKill(char **commande_args){
     return -1;
 }
 
+
+
+int excecuteFG(char **command_args){
+    if(len(command_args) == 2){
+        if(start_with_char_then_digits(command_args[1],'%')){
+            return fg_id(atoi(command_args[1]+1));
+        }
+    }
+
+    return -1;
+}
+
 /**
  * @brief Get the last return code
  * @return The last return code
@@ -258,14 +272,10 @@ int executeInternalCommand(char **commande_args){
     if(strcmp(commande_args[0],"cd") == 0){
         return execute_cd(commande_args);
     }
+    if(strcmp(commande_args[0],"fg") == 0){
+        return excecuteFG(commande_args);
+    }
 
     dprintf(STDERR_FILENO,"Erreur: commande interne non reconnue\n");
     return -1;
 }
-
-
-
-
-
-
-
