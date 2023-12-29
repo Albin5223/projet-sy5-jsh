@@ -171,12 +171,12 @@ int executeKill(char **commande_args){
         if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
             return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
         }
+        else if(start_with_char_then_digits(commande_args[1],'-') && is_number_strict(commande_args[2])){ // if we have command like "kill -9 pid"
+            return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
+        }
     }
     else if(len(commande_args) == 2 && is_number_strict(commande_args[1])){  // if we have command like "kill pid"
         return kill(atoi(commande_args[1]),SIGTERM);
-    }
-    else if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){ // if we have command like "kill -9 pid"
-        return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
     }
 
     char pourcentage = '%';
