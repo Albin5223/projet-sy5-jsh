@@ -102,91 +102,63 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
     char tmp_files_name[nb_subs][256];
     char **main_command = get_main_command(command_args);
+    pid_t child_pids[nb_subs];
 
     char ***tab = malloc(sizeof(char**) * (nb_subs + 1));
-    if (malloc_ok(tab) == 1) exit(1);
+    if (malloc_ok(tab) == 1) exit(EXIT_FAILURE);
     tab[nb_subs] = NULL;
     command_args += len(main_command);
+    
     for (int i = 0; i < nb_subs; i++){
         tab[i] = get_substitution_process(command_args, nb_subs);
         command_args += len(tab[i]) + 1;
-    }
 
-    for (int i = 0; i < nb_subs; i++) {
         snprintf(tmp_files_name[i], sizeof(tmp_files_name[i]), "/tmp/%d.tmp", i);
         int fd_tmp = open(tmp_files_name[i], O_RDWR | O_CREAT | O_TRUNC, 0600);
-        if (fd_tmp == -1) exit(1);
+        if (fd_tmp == -1) {
+               ret = 1;
+            goto cleanup;
+        }
 
-        if (fork() == 0) {
+        child_pids[i] = fork();
+        if (child_pids[i] == -1) {
+               close(fd_tmp);
+            ret = 1;
+            goto cleanup;
+        }
+
+        if (child_pids[i] == 0) { // Processus fils
             dup2(fd_tmp, STDOUT_FILENO);
             close(fd_tmp);
 
+            // Exécution de la commande interne ou externe
             if (isInternalCommand(tab[i]) == 1){
                 ret = executeInternalCommand(tab[i]);
                 exit(ret);
             }
 
-            setpgid(0, 0); // Set the process group ID to the process ID
-        
-            int descripteur_sortie_standart = -1;
-            int descripteur_sortie_erreur = -1;
-            int descripteur_entree = -1; 
-
-            if(isRedirectionEntree(tab[i]) != -1){
-                descripteur_entree = getFichierEntree(tab[i]);
-                if(descripteur_entree == -1){
-                    dprintf(STDERR_FILENO,"bash: %d: %s.\n", getFichierEntree(tab[i]), strerror(errno));
-                    exit(1);
-                }
-                dup2(descripteur_entree, STDIN_FILENO);
-                tab[i] = getCommandeWithoutRedirectionEntree(tab[i]);
-            }
-
-            if(isRedirection(tab[i]) != -1){
-                int *fd = getDescriptorOfRedirection(tab[i]);
-                if(fd[0] != -1){
-                    descripteur_sortie_standart = fd[0];
-                }
-                if(fd[1] != -1){
-                    descripteur_sortie_erreur = fd[1];
-                }
-
-                if(isRedirectionStandart(tab[i]) != -1 && fd[0] == -1){
-                    free(fd);
-                    dprintf(STDERR_FILENO,"bash: sortie: %s\n", "cannot overwrite existing file");
-                    exit(1);
-                }
-                if(isRedirectionErreur(tab[i]) != -1 && fd[1] == -1){
-                    free(fd);
-                    exit(1);
-                }
-
-                //On récupère la commande cad : comm > fic, 
-                tab[i] = getCommandeOfRedirection(tab[i]);
-                free(fd);
-            }
-
+            setpgid(0, 0);
             execvp(tab[i][0], tab[i]);
-            exit(1);
+            exit(EXIT_FAILURE);
         } else {
             close(fd_tmp);
-            int status;
-            wait(&status);
-            if (WIFEXITED(status)){
-                if (WEXITSTATUS(status) != 0){
-                    return 1;
-                }
-            }
         }
     }
 
     for (int i = 0; i < nb_subs; i++) {
-        wait(NULL);
+        int status;
+        waitpid(child_pids[i], &status, 0);
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+            ret = 1;
+        }
     }
 
     int start = len(main_command);
     main_command = realloc(main_command, sizeof(char*) * (start + nb_subs + 1));
-    if (malloc_ok(main_command) == 1) goto error;
+    if (malloc_ok(main_command) == 1) {
+        ret = 1;
+        goto cleanup;
+    }
     main_command[start + nb_subs] = NULL;
 
     for (int i = 0; i < nb_subs; i++) {
@@ -196,25 +168,21 @@ int execute_substitution_process(char **command_args, int nb_subs){
     if (fork() == 0) {
         if (isInternalCommand(main_command) == 1){
             ret = executeInternalCommand(main_command);
+            exit(ret);
         } else {
-            puts("main_command");
             execvp(main_command[0], main_command);
-            goto error;
+            exit(EXIT_FAILURE);
         }
     }
 
     wait(NULL);
 
+cleanup:
+    // Nettoyage des ressources
     for (int i = 0; i < nb_subs; i++) {
         unlink(tmp_files_name[i]);
+        free(tab[i]);
     }
-
+    free(tab);
     return ret;
-
-
-error : 
-    for (int i = 0; i < nb_subs; i++) {
-        unlink(tmp_files_name[i]);
-    }
-    return 1;
 }
