@@ -37,6 +37,8 @@ int isInternalCommand(char ** commands){
     if (strcmp(commands[0], LAST) == 0) return 1;
     if (strcmp(commands[0], JOBS) == 0) return 1;
     if (strcmp(commands[0], KILL) == 0) return 1;
+    if (strcmp(commands[0], FG) == 0) return 1;
+    if (strcmp(commands[0], BG) == 0) return 1;
     return 0;
 }
 
@@ -169,16 +171,45 @@ int executeKill(char **commande_args){
         if(start_with_char_then_digits(commande_args[1],'-') && start_with_char_then_digits(commande_args[2],'%')){
             return send_signal_to_id(atoi(commande_args[2]+1),atoi(commande_args[1]+1));   // We remove the first characters of the strings (the - and %) and we convert them to an int
         }
+        else if(start_with_char_then_digits(commande_args[1],'-') && is_number_strict(commande_args[2])){ // if we have command like "kill -9 pid"
+            return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
+        }
     }
     else if(len(commande_args) == 2 && is_number_strict(commande_args[1])){  // if we have command like "kill pid"
         return kill(atoi(commande_args[1]),SIGTERM);
     }
-    else if(start_with_char_then_digits(commande_args[1],'-') && is_number(commande_args[1]) && is_number_strict(commande_args[2])){ // if we have command like "kill -9 pid"
-        return kill(atoi(commande_args[2]),atoi(commande_args[1]+1));
-    }
 
     char pourcentage = '%';
     dprintf(STDERR_FILENO,"Erreur: kill [-sig] [%cjob] \n",pourcentage);
+    return -1;
+}
+
+
+
+int excecuteFG(char **command_args){
+    if(len(command_args) == 2){
+        if(start_with_char_then_digits(command_args[1],'%')){
+            return fg_id(atoi(command_args[1]+1));
+        }
+    }
+
+    return -1;
+}
+
+
+int executeBG(char **command_args){
+    if(len(command_args) == 2){
+        if(start_with_char_then_digits(command_args[1],'%')){
+            int id = atoi(command_args[1]+1);
+
+            if(get_pid_by_id(id) == -1){
+                dprintf(STDERR_FILENO,"Erreur: le job %d n'existe pas\n",id);
+                return -1;
+            }
+            return send_signal_to_id(id,SIGCONT);
+        }
+    }
+
     return -1;
 }
 
@@ -258,14 +289,13 @@ int executeInternalCommand(char **commande_args){
     if(strcmp(commande_args[0],"cd") == 0){
         return execute_cd(commande_args);
     }
+    if(strcmp(commande_args[0],"fg") == 0){
+        return excecuteFG(commande_args);
+    }
+    if(strcmp(commande_args[0],"bg") == 0){
+        return executeBG(commande_args);
+    }
 
     dprintf(STDERR_FILENO,"Erreur: commande interne non reconnue\n");
     return -1;
 }
-
-
-
-
-
-
-
