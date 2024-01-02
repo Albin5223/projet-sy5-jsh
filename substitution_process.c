@@ -47,38 +47,41 @@ int exist_fic(char *file){
  * @return un tableau de la première occurence de ce qui se trouve à l'intérieur de : '<(' et ')'
 */
 char **get_substitution_process(char **command_args) {
-    int start = -1;
     int diff = 0;
     int size = 0;
     int i = 0;
+    bool in = false;
     bool out = false;
-
-    while (out) {
-        if (start == -1 && strcmp(command_args[i], "<(") == 0) {
-            start = i + 1;
-        }
+    //cat -n <( echo "Header" ) <( echo "Footer" ) <( diff <( echo "aaaz" ) <( echo "zzz" ) )
+    while (!out) {
         if (command_args[i] == NULL) break;
-
-        if (strcmp(command_args[i], "<(") == 0) {
-            diff++;
-        }
-        else if (strcmp(command_args[i], ")") == 0) {
-            if (diff == 1) out = true;
-            else diff--;
-        }
-        else {
-            size++;
+        
+        if (in){
+            if (strcmp(command_args[i], "<(") == 0) diff++;
+            if (strcmp(command_args[i], ")") == 0){
+                if (diff == 1) {
+                    in = false;
+                    out = true;
+                    diff--;
+                }
+                else diff--;
+            }
+            if (in) size++;
+        } else {
+            if (strcmp(command_args[i], "<(") == 0) {
+                in = true;
+                diff++;
+            }
         }
         i++;
     }
 
-    printf("size : %d\n", size);
     char **tab_subs = malloc(sizeof(char*) * (size + 1));
-    if (tab_subs == NULL) {
-        exit(1);
-    }
+    if (tab_subs == NULL) exit(1);
 
-    for (int j = 0; j < size; j++) tab_subs[j] = command_args[start + j];
+    for (int j = 0; j < size; j++) {
+        tab_subs[j] = command_args[1 + j];
+    }
     tab_subs[size] = NULL;
 
     return tab_subs;
@@ -198,12 +201,10 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
 
         if (pid == -1) {
             ret = 1;
-            perror("substitution_process");
             goto cleanup;
         }
   
         if (pid == 0) {
-            affiche_tab(tab[j]);
             dup2(pipefd[j][1], STDOUT_FILENO);
 
             if (isInternalCommand(tab[j]) == 1){
@@ -217,7 +218,6 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
             }
 
             if (nb_subs(tab[j]) > 0){
-                affiche_tab(tab[j]);
                 ret = execute_substitution_process(tab[j], nb_subs(tab[j]));
                 exit(ret);
             }
