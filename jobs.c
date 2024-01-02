@@ -208,8 +208,12 @@ int fg_id(int id){
         return 1;
     }
 
+    redirect_signals_to(pid); // Redirect the signals to the child process
+
     int status;
     waitpid(pid, &status, 0);
+
+    redirect_signals_to(getpid()); // Redirect the signals to the shell
 
     // Child is done
     if (WIFEXITED(status)) {
