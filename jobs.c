@@ -358,19 +358,21 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
 
     if (!is_background) { // If the command is not run in the background
         
-            
         redirect_signals_to(child_pid); // Redirect the signals to the child process
 
         while (1){
             update_status(child_pid);
             if(jobs[get_position_with_pid(child_pid)].status == DONE || jobs[get_position_with_pid(child_pid)].status == KILLED){
-                
                 int exit_code = jobs[get_position_with_pid(child_pid)].exit_code; // Get the exit code of the job
                 remove_job(child_pid);
+                tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+                redirect_signals_to(getpid()); // Redirect the signals to the shell
                 return exit_code;
             }
             else if(jobs[get_position_with_pid(child_pid)].status == STOPPED){
                 print_job_with_pid(child_pid, false,STDERR_FILENO);
+                tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+                redirect_signals_to(getpid()); // Redirect the signals to the shell
                 return 0;
             }
             else if(jobs[get_position_with_pid(child_pid)].status == RUNNING){
@@ -378,6 +380,8 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
             }
             else{
                 dprintf(STDERR_FILENO,"Error: unknown status.\n");
+                tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+                redirect_signals_to(getpid()); // Redirect the signals to the shell
                 return 1;
             }
         }
@@ -397,11 +401,8 @@ int add_job_command(char **commande_args, bool is_background) {
     if (nb_subs(commande_args) > 0) {
         value = execute_substitution_process(commande_args, nb_subs(commande_args));
     }
-
-    /*
-    struct sigaction ignore = {0};
-    ignore.sa_handler = SIG_IGN;
-    */
+    
+    setpgid(0, 0); // Set the process group ID to the process ID
 
     pid_t pid = fork();
     if (pid == 0) { // Child process
@@ -410,14 +411,12 @@ int add_job_command(char **commande_args, bool is_background) {
             exit(value);
         }
 
-        setpgid(0, 0); // Set the process group ID to the process ID
-        /*
         if(!is_background){
-            sigaction(SIGTTOU, &ignore, NULL); // Ignore SIGINT
             tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
-
         }
-        */
+        else{
+            setpgid(0,0);   // Set the process group ID to the process ID, so that the process is not a child of the shell
+        }
         
         int descripteur_sortie_standart = -1;
         int descripteur_sortie_erreur = -1;
