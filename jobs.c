@@ -493,12 +493,6 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
     int numberCommand = nbPipe + 1;
     int tabPid[numberCommand];
     int status;
-    
-    for (int i = 0; commands[i].cmd[0] != NULL; i++) {  // Execute each subcommand
-        for (int j = 0; commands[i].cmd[j] != NULL; j++) {  // Execute each subcommand
-            printf("i : %d, j : %d, commande : %s\n",i,j,commands[i].cmd[j]);
-        }
-    }
 
     int pid = fork();
     if(pid == 0){
@@ -646,14 +640,14 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
  * @param commande_args The all command
 */
 int execute_commande(char **commande_args) {
-    Command *commands = split_commands_for_jobs(commande_args,"&"); // Split the command into multiple subcommands (separated by &)
+    Command *commands = split_commands_for_jobs(commande_args, "&"); // Split the command into multiple subcommands (separated by &)
     int status;
     for (int i = 0; commands[i].cmd[0] != NULL; i++) {  // Execute each subcommand
 
         int is_pipe = isPipe(commands[i].cmd);
         int nb_substitution = nb_subs(commands[i].cmd);
 
-        if (nb_substitution > 0 || !is_pipe) {   
+        if (nb_substitution > 0 || !is_pipe) {
             status = add_job_command(commands[i].cmd, commands[i].is_background);
         }
         else{   // Else, execute it with pipe

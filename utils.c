@@ -220,14 +220,6 @@ void print_tab(char **tab) {
     }
 }
 
-int malloc_ok(void *ptr) {
-    if (ptr == NULL) {
-        printf("Error in 'path_shell' : couldn't malloc...\n");
-        exit(1);
-    }
-    return 0;
-}
-
 void affiche_tab(char **tab){
     int i = 0;
     while(tab[i] != NULL){

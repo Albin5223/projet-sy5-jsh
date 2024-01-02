@@ -3,6 +3,7 @@
 #include "redirection.h"
 #include "internalCommand.h"
 #include "jobs.h"
+#include "pipe.h"
 
 /**
  * Retourne le nombre de subs '<(' dans le tableau de commandes
@@ -36,6 +37,14 @@ bool ok_subs(char **command_args, int i){
     return false;
 }
 
+int is_valid_fic(char *file){
+    if (file == NULL) return 0;
+    int fd = open(file, O_RDONLY);
+    if (fd == -1) return -1;
+    close(fd);
+    return 0;
+}
+
 /**
  * Retourne un tableau de la première occurence de ce qui se trouve à l'intérieur de : '<(' et ')'
  * @param command_args
@@ -58,7 +67,7 @@ char **get_substitution_process(char **command_args, int nb_subs) {
     }
 
     char **tab_subs = malloc(sizeof(char*) * (size + 1));
-    if (malloc_ok(tab_subs)) exit(1);
+    if (tab_subs == NULL) exit(1);
 
     int j = 0;
     for(int i = start; i < start + size; i++){
@@ -72,6 +81,7 @@ char **get_substitution_process(char **command_args, int nb_subs) {
 
 /**
  * cat -n <( echo "Header" ) <( ps a ) <( echo "Footer" ) 
+ * cat -n <( echo "Header" ) fichierTest <( echo "Footer" ) 
  * cat <( echo "Header" | tr 'a-z' 'A-Z' ) <( ps a ) <( echo "Footer" | tr 'a-z' 'A-Z' )
  * diff <( echo "aaaz" ) <( echo "zzz" ) &
 */
@@ -88,7 +98,7 @@ char **get_main_command(char **command_args){
     }
 
     char **tab = malloc(sizeof(char*) * (size + 1));
-    if (malloc_ok(tab)) exit(1);
+    if (tab == NULL) exit(1);
 
     for(int i = 0; i < size; i++){
         tab[i] = command_args[i];
@@ -105,32 +115,46 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
     char tmp_files_name[nb_subs][256];
     char **main_command = get_main_command(command_args);
-    pid_t child_pids[nb_subs];
 
     char ***tab = malloc(sizeof(char**) * (nb_subs + 1));
-    if (malloc_ok(tab) == 1) exit(EXIT_FAILURE);
+    if (tab == NULL) exit(1);
     tab[nb_subs] = NULL;
     command_args += len(main_command);
     
     for (int i = 0; i < nb_subs; i++){
-        tab[i] = get_substitution_process(command_args, nb_subs);
-        command_args += len(tab[i]) + 1;
-
-        snprintf(tmp_files_name[i], sizeof(tmp_files_name[i]), "/tmp/%d.tmp", i);
-        int fd_tmp = open(tmp_files_name[i], O_RDWR | O_CREAT | O_TRUNC, 0600);
-        if (fd_tmp == -1) {
-               ret = 1;
-            goto cleanup;
+        if (is_valid_fic(command_args[0]) == 0){
+            printf("Fichier %s déjà existant\n", command_args[0]);
+            snprintf(tmp_files_name[i], sizeof(tmp_files_name[i]), "%s", command_args[0]);
+            command_args += strlen(command_args[0]) + 1;
+            continue;
         }
 
-        child_pids[i] = fork();
-        if (child_pids[i] == -1) {
-               close(fd_tmp);
+        char x_name[256];
+        snprintf(x_name, sizeof(x_name), "/tmp/%d", i + 10);  
+        // snprintf(x_name, sizeof(x_name), "/dev/fd/%d", i + 10);    // + 10, pour éviter les conflits avec les autres fichiers temporaires
+        int fd = open(x_name, O_RDWR | O_CREAT | O_TRUNC, 0600);
+        if (fd == -1) {
+            ret = 1;
+            goto cleanup;
+        }
+        memcpy(tmp_files_name[i], x_name, strlen(x_name) + 1);
+        
+        tab[i] = get_substitution_process(command_args, nb_subs);
+        command_args += len(tab[i]) + 1;
+        int fd_tmp = open(tmp_files_name[i], O_RDWR | O_CREAT | O_TRUNC, 0600);
+        if (fd_tmp == -1) {
             ret = 1;
             goto cleanup;
         }
 
-        if (child_pids[i] == 0) { // Processus fils
+        pid_t pid = fork();
+        if (pid == -1) {
+            close(fd_tmp);
+            ret = 1;
+            goto cleanup;
+        }
+
+        if (pid == 0) { // Processus fils
             dup2(fd_tmp, STDOUT_FILENO);
             close(fd_tmp);
 
@@ -140,7 +164,12 @@ int execute_substitution_process(char **command_args, int nb_subs){
                 exit(ret);
             }
 
-            setpgid(0, 0);
+            if (isPipe(tab[i]) == 1){
+                ret = add_job_command_with_pipe(tab[i], false);
+                exit(ret);
+            }
+
+            // setpgid(0, 0);
             execvp(tab[i][0], tab[i]);
             exit(EXIT_FAILURE);
         } else {
@@ -150,7 +179,7 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
     for (int i = 0; i < nb_subs; i++) {
         int status;
-        waitpid(child_pids[i], &status, 0);
+        wait(&status);
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             ret = 1;
         }
@@ -158,7 +187,7 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
     int start = len(main_command);
     main_command = realloc(main_command, sizeof(char*) * (start + nb_subs + 1));
-    if (malloc_ok(main_command) == 1) {
+    if (main_command == NULL) {
         ret = 1;
         goto cleanup;
     }
