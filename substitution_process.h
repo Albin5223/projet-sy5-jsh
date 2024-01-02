@@ -12,7 +12,7 @@
 #define SUBSTITUTION_PROCESS_H
 
 int nb_subs(char **command_args);
-bool ok_subs(char **command_args, int i);
+int ok_subs(char **command_args, int i);
 char **get_substitution_process(char **command_args);
 int execute_substitution_process(char **command_args, int nb_subs);
 char **get_main_command(char **command_args);
