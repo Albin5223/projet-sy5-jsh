@@ -6,9 +6,8 @@
 #include "pipe.h"
 
 /**
- * Retourne le nombre de subs '<(' dans le tableau de commandes
  * @param command_args tableau de commandes
- * @return le nombre de subs '<(' dans le tableau de commandes
+ * @return le nombre de subs '<(' suivi de ')' dans une chaine de caractères donnée
 */
 int nb_subs(char **command_args){
     int nb = 0;
@@ -21,12 +20,11 @@ int nb_subs(char **command_args){
 }
 
 /**
- * Retourne true si lorsqu'on parcourt le tableau de commandes, et qu'on trouve '<(' on a bien ')' après
  * @param command_args
  * @param i
- * @return true si lorsqu'on parcourt le tableau de commandes, et qu'on trouve '<(' on a bien ')' après
+ * @return retourne le nombre de '<(' suivi ')', lorsqu'on parcourt le tableau de commandes
 */
-bool ok_subs(char **command_args, int i){
+int ok_subs(char **command_args, int i){
     if (strcmp(command_args[i], "<(") == 0){
         while(1){
             char *tmp = command_args[i++];
@@ -44,35 +42,44 @@ int exist_fic(char *file){
 }
 
 /**
- * Retourne un tableau de la première occurence de ce qui se trouve à l'intérieur de : '<(' et ')'
  * @param command_args
- * @param nb_subs
+ * @param nb_substitution
  * @return un tableau de la première occurence de ce qui se trouve à l'intérieur de : '<(' et ')'
 */
 char **get_substitution_process(char **command_args) {
+    int start = -1;
+    int diff = 0;
     int size = 0;
-    int start;
-    for (int i = 0; command_args[i] != NULL; i++) {
-        if (ok_subs(command_args, i)) {
-            i++; // Passer le '<('
-            start = i;
-            while (strcmp(command_args[i], ")") != 0 && command_args[i] != NULL) {
-                size++;
-                i++;
-            }
-            break;
+    int i = 0;
+    bool out = false;
+
+    while (out) {
+        if (start == -1 && strcmp(command_args[i], "<(") == 0) {
+            start = i + 1;
         }
+        if (command_args[i] == NULL) break;
+
+        if (strcmp(command_args[i], "<(") == 0) {
+            diff++;
+        }
+        else if (strcmp(command_args[i], ")") == 0) {
+            if (diff == 1) out = true;
+            else diff--;
+        }
+        else {
+            size++;
+        }
+        i++;
     }
 
+    printf("size : %d\n", size);
     char **tab_subs = malloc(sizeof(char*) * (size + 1));
-    if (tab_subs == NULL) exit(1);
-
-    int j = 0;
-    for(int i = start; i < start + size; i++){
-        tab_subs[j++] = command_args[i];
+    if (tab_subs == NULL) {
+        exit(1);
     }
 
-    tab_subs[j] = NULL;  
+    for (int j = 0; j < size; j++) tab_subs[j] = command_args[start + j];
+    tab_subs[size] = NULL;
 
     return tab_subs;
 }
@@ -107,124 +114,147 @@ char **get_main_command(char **command_args){
     return tab;
 }
 
+/**
+ * @param command_args
+ * @return le nombre d'arguments dans une chaine de caractères donnée
+*/
 int nb_args(char **command_args){
-    int nb = 0;
-    bool in_subs = false;
+    int size = 0;
+    int diff = 0;
     int i = 0;
+    int fd;
+    bool in = false;
 
-    while(1){
+    while (1) {
         if (command_args[i] == NULL) break;
-
-        if (in_subs){
+        
+        if (in){
+            if (strcmp(command_args[i], "<(") == 0) diff++;
             if (strcmp(command_args[i], ")") == 0){
-                in_subs = false;
-                continue;
+                if (diff == 1) {
+                    in = false;
+                    diff--;
+                }
+                else diff--;
             }
         } else {
-            if (strcmp(command_args[i], "<(") == 0){
-                in_subs = true;
-                continue;
+            if (strcmp(command_args[i], "<(") == 0) {
+                in = true;
+                diff++;
             }
-            nb++;
+            if ((fd = exist_fic(command_args[i])) != 1){
+                close(fd);
+            }
+            size++;
         }
-
         i++;
     }
-    return nb;
+
+    return size;
 }
+
 
 /**
  * cat -n <( echo "Header" ) <( ps a ) <( echo "Footer" ) 
  * cat -n <( echo "Header" ) fichierTest <( echo "Footer" ) 
+ * cat -n <( echo "Header" ) <( echo "Footer" ) <( diff <( echo "aaaz" ) <( echo "zzz" ) )
  * cat <( echo "Header" | tr 'a-z' 'A-Z' ) <( ps a ) <( echo "Footer" | tr 'a-z' 'A-Z' )
  * diff <( echo "aaaz" ) <( echo "zzz" ) &
 */
 
-int execute_substitution_process(char **command_args, int nb_subs) {
+int execute_substitution_process(char **command_args, int nb_substitution) {
     if (isRedirection(command_args) != -1) return 1;
 
     int ret = 0;
     char **main_command = get_main_command(command_args);
 
-    char ***tab = malloc(sizeof(char**) * (nb_subs + 1));
+    char ***tab = malloc(sizeof(char**) * (nb_substitution + 1));
     if (tab == NULL) exit(1);
-    tab[nb_subs] = NULL;
-    command_args += len(main_command);
-    int j = 0; // pour parcourir le tableau : tab
+    tab[nb_substitution] = NULL;
 
+    command_args += len(main_command);
     int size = nb_args(command_args);
-    char tmp_files_name[size][256];
+    char reference[size][256];
+
+    int pipefd[nb_substitution][2];
+    int j = 0; // pour parcourir le tableau : tab et pipefd
 
     for (int i = 0; i < size; i++){
+
         if (strcmp(command_args[0], "<(") != 0){
-            snprintf(tmp_files_name[i], sizeof(tmp_files_name[i]), "%s", command_args[0]);
+            snprintf(reference[i], sizeof(reference[i]), "%s", command_args[0]);
             command_args++;
             continue;
         }
 
-        char x_name[256];
-        snprintf(x_name, sizeof(x_name), "/tmp/%d", i + 10);  
-        memcpy(tmp_files_name[i], x_name, strlen(x_name) + 1);
-        // snprintf(x_name, sizeof(x_name), "/dev/fd/%d", i + 10);    // + 10, pour éviter les conflits avec les autres fichiers temporaires
-        // memcpy(tmp_files_name[i], x_name, strlen(x_name) + 1);
-        
+        if (pipe(pipefd[j]) == -1) {
+            ret = 1;
+            perror("substitution_process");
+            goto cleanup;
+        }
+
         tab[j] = get_substitution_process(command_args);
-        command_args += len(tab[j]) + 2;    // afin de sauter : <( et )
-        int fd_tmp = open(tmp_files_name[i], O_RDWR | O_CREAT | O_TRUNC, 0600);
-        if (fd_tmp == -1) {
-            ret = 1;
-            goto cleanup;
-        }
-
         pid_t pid = fork();
+
         if (pid == -1) {
-            close(fd_tmp);
             ret = 1;
+            perror("substitution_process");
             goto cleanup;
         }
+  
+        if (pid == 0) {
+            affiche_tab(tab[j]);
+            dup2(pipefd[j][1], STDOUT_FILENO);
 
-        if (pid == 0) { // Processus fils
-            dup2(fd_tmp, STDOUT_FILENO);
-            close(fd_tmp);
-
-            // Exécution de la commande interne ou externe
             if (isInternalCommand(tab[j]) == 1){
-                ret = executeInternalCommand(tab[j++]);
+                ret = executeInternalCommand(tab[j]);
                 exit(ret);
             }
 
             if (isPipe(tab[j]) == 1){
-                ret = add_job_command_with_pipe(tab[j++], false);
+                ret = add_job_command_with_pipe(tab[j], false);
                 exit(ret);
             }
 
-            // setpgid(0, 0);
-            j++;
-            execvp(tab[j - 1][0], tab[j - 1]);
+            if (nb_subs(tab[j]) > 0){
+                affiche_tab(tab[j]);
+                ret = execute_substitution_process(tab[j], nb_subs(tab[j]));
+                exit(ret);
+            }
+
+            execvp(tab[j][0], tab[j]);
             exit(EXIT_FAILURE);
         } else {
-            close(fd_tmp);
+            close(pipefd[j][1]);
+             
+            int status;
+            waitpid(pid, &status, 0);
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                ret = 1;
+                goto cleanup;
+            }
+
+            snprintf(reference[i], sizeof(reference[i]), "/dev/fd/%d", pipefd[j][0]);
+            
+            command_args += len(tab[j]) + 2;    // afin de sauter : <( et )
         }
     }
 
-    for (int i = 0; i < size; i++) {
-        int status;
-        wait(&status);
-        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            ret = 1;
-        }
+    for (int i = 0; i < nb_substitution; i++){
+        wait(NULL);
     }
 
     int start = len(main_command);
     main_command = realloc(main_command, sizeof(char*) * (start + size + 1));
     if (main_command == NULL) {
         ret = 1;
+        perror("substitution_process");
         goto cleanup;
     }
     main_command[start + size] = NULL;
 
     for (int i = 0; i < size; i++) {
-        main_command[start + i] = tmp_files_name[i];
+        main_command[start + i] = reference[i];
     }
 
     if (fork() == 0) {
@@ -237,14 +267,13 @@ int execute_substitution_process(char **command_args, int nb_subs) {
         }
     }
 
+    for (int i = 0; i < nb_substitution; i++){
+        close(pipefd[i][0]);
+    }
+
     wait(NULL);
 
 cleanup:
-    // Nettoyage des ressources
-    for (int i = 0; i < size; i++) {
-        unlink(tmp_files_name[i]);
-        free(tab[i]);
-    }
     free(tab);
     return ret;
 }
