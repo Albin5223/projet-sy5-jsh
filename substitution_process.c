@@ -76,6 +76,25 @@ char **get_substitution_process(char **command_args) {
         i++;
     }
 
+    if (start == -1) {
+        return NULL;
+    }
+
+    int diff = 1;
+
+    for (int i = start; command_args[i] != NULL; i++) {
+        if (strcmp(command_args[i], "<(") == 0){
+            diff++;
+        }
+
+        if (strcmp(command_args[i], ")") == 0){
+            if (diff - 1 == 0) break;
+            diff--;
+        }
+
+        size++;
+    }
+
     char **tab_subs = malloc(sizeof(char*) * (size + 1));
     if (tab_subs == NULL) exit(1);
 
@@ -201,6 +220,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
 
         if (pid == -1) {
             ret = 1;
+            perror("substitution_process");
             goto cleanup;
         }
   
