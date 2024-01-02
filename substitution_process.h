@@ -13,9 +13,10 @@
 
 int nb_subs(char **command_args);
 bool ok_subs(char **command_args, int i);
-char **get_substitution_process(char **command_args, int nb);
-int execute_substitution_process(char **command_args, int nb);
-int subs_write_in_pipe(char ***tab, int *pipefd, char **final_cmd, int start);
+char **get_substitution_process(char **command_args);
+int execute_substitution_process(char **command_args, int nb_subs);
 char **get_main_command(char **command_args);
+int nb_args(char **command_args);
+int exist_fic(char *path);
 
 #endif

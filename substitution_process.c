@@ -37,12 +37,10 @@ bool ok_subs(char **command_args, int i){
     return false;
 }
 
-int is_valid_fic(char *file){
+int exist_fic(char *file){
     if (file == NULL) return 0;
     int fd = open(file, O_RDONLY);
-    if (fd == -1) return -1;
-    close(fd);
-    return 0;
+    return (fd != -1) ? fd : 1;
 }
 
 /**
@@ -51,10 +49,10 @@ int is_valid_fic(char *file){
  * @param nb_subs
  * @return un tableau de la première occurence de ce qui se trouve à l'intérieur de : '<(' et ')'
 */
-char **get_substitution_process(char **command_args, int nb_subs) {
+char **get_substitution_process(char **command_args) {
     int size = 0;
     int start;
-    for (int i = 0; i < nb_subs && command_args[i] != NULL; i++) {
+    for (int i = 0; command_args[i] != NULL; i++) {
         if (ok_subs(command_args, i)) {
             i++; // Passer le '<('
             start = i;
@@ -80,20 +78,21 @@ char **get_substitution_process(char **command_args, int nb_subs) {
 }
 
 /**
- * cat -n <( echo "Header" ) <( ps a ) <( echo "Footer" ) 
- * cat -n <( echo "Header" ) fichierTest <( echo "Footer" ) 
- * cat <( echo "Header" | tr 'a-z' 'A-Z' ) <( ps a ) <( echo "Footer" | tr 'a-z' 'A-Z' )
- * diff <( echo "aaaz" ) <( echo "zzz" ) &
-*/
-
-/**
  * Retourne le tableau de commande avant le premier '<('
  * @param command_args
  * @return le tableau de commande avant le premier '<('
 */
 char **get_main_command(char **command_args){
     int size = 0;
-    while(command_args[size] != NULL && strcmp(command_args[size], "<(") != 0){
+
+    int fd;
+    while(1){
+        if (command_args[size] == NULL) break;
+        if (strcmp(command_args[size], "<(") == 0) break;
+        if ((fd = exist_fic(command_args[size])) != 1){
+            close(fd);
+            break;
+        }
         size++;
     }
 
@@ -108,39 +107,69 @@ char **get_main_command(char **command_args){
     return tab;
 }
 
-int execute_substitution_process(char **command_args, int nb_subs){
+int nb_args(char **command_args){
+    int nb = 0;
+    bool in_subs = false;
+    int i = 0;
+
+    while(1){
+        if (command_args[i] == NULL) break;
+
+        if (in_subs){
+            if (strcmp(command_args[i], ")") == 0){
+                in_subs = false;
+                continue;
+            }
+        } else {
+            if (strcmp(command_args[i], "<(") == 0){
+                in_subs = true;
+                continue;
+            }
+            nb++;
+        }
+
+        i++;
+    }
+    return nb;
+}
+
+/**
+ * cat -n <( echo "Header" ) <( ps a ) <( echo "Footer" ) 
+ * cat -n <( echo "Header" ) fichierTest <( echo "Footer" ) 
+ * cat <( echo "Header" | tr 'a-z' 'A-Z' ) <( ps a ) <( echo "Footer" | tr 'a-z' 'A-Z' )
+ * diff <( echo "aaaz" ) <( echo "zzz" ) &
+*/
+
+int execute_substitution_process(char **command_args, int nb_subs) {
     if (isRedirection(command_args) != -1) return 1;
 
     int ret = 0;
-
-    char tmp_files_name[nb_subs][256];
     char **main_command = get_main_command(command_args);
 
     char ***tab = malloc(sizeof(char**) * (nb_subs + 1));
     if (tab == NULL) exit(1);
     tab[nb_subs] = NULL;
     command_args += len(main_command);
-    
-    for (int i = 0; i < nb_subs; i++){
-        if (is_valid_fic(command_args[0]) == 0){
-            printf("Fichier %s déjà existant\n", command_args[0]);
+    int j = 0; // pour parcourir le tableau : tab
+
+    int size = nb_args(command_args);
+    char tmp_files_name[size][256];
+
+    for (int i = 0; i < size; i++){
+        if (strcmp(command_args[0], "<(") != 0){
             snprintf(tmp_files_name[i], sizeof(tmp_files_name[i]), "%s", command_args[0]);
-            command_args += strlen(command_args[0]) + 1;
+            command_args++;
             continue;
         }
 
         char x_name[256];
         snprintf(x_name, sizeof(x_name), "/tmp/%d", i + 10);  
-        // snprintf(x_name, sizeof(x_name), "/dev/fd/%d", i + 10);    // + 10, pour éviter les conflits avec les autres fichiers temporaires
-        int fd = open(x_name, O_RDWR | O_CREAT | O_TRUNC, 0600);
-        if (fd == -1) {
-            ret = 1;
-            goto cleanup;
-        }
         memcpy(tmp_files_name[i], x_name, strlen(x_name) + 1);
+        // snprintf(x_name, sizeof(x_name), "/dev/fd/%d", i + 10);    // + 10, pour éviter les conflits avec les autres fichiers temporaires
+        // memcpy(tmp_files_name[i], x_name, strlen(x_name) + 1);
         
-        tab[i] = get_substitution_process(command_args, nb_subs);
-        command_args += len(tab[i]) + 1;
+        tab[j] = get_substitution_process(command_args);
+        command_args += len(tab[j]) + 2;    // afin de sauter : <( et )
         int fd_tmp = open(tmp_files_name[i], O_RDWR | O_CREAT | O_TRUNC, 0600);
         if (fd_tmp == -1) {
             ret = 1;
@@ -159,25 +188,26 @@ int execute_substitution_process(char **command_args, int nb_subs){
             close(fd_tmp);
 
             // Exécution de la commande interne ou externe
-            if (isInternalCommand(tab[i]) == 1){
-                ret = executeInternalCommand(tab[i]);
+            if (isInternalCommand(tab[j]) == 1){
+                ret = executeInternalCommand(tab[j++]);
                 exit(ret);
             }
 
-            if (isPipe(tab[i]) == 1){
-                ret = add_job_command_with_pipe(tab[i], false);
+            if (isPipe(tab[j]) == 1){
+                ret = add_job_command_with_pipe(tab[j++], false);
                 exit(ret);
             }
 
             // setpgid(0, 0);
-            execvp(tab[i][0], tab[i]);
+            j++;
+            execvp(tab[j - 1][0], tab[j - 1]);
             exit(EXIT_FAILURE);
         } else {
             close(fd_tmp);
         }
     }
 
-    for (int i = 0; i < nb_subs; i++) {
+    for (int i = 0; i < size; i++) {
         int status;
         wait(&status);
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
@@ -186,14 +216,14 @@ int execute_substitution_process(char **command_args, int nb_subs){
     }
 
     int start = len(main_command);
-    main_command = realloc(main_command, sizeof(char*) * (start + nb_subs + 1));
+    main_command = realloc(main_command, sizeof(char*) * (start + size + 1));
     if (main_command == NULL) {
         ret = 1;
         goto cleanup;
     }
-    main_command[start + nb_subs] = NULL;
+    main_command[start + size] = NULL;
 
-    for (int i = 0; i < nb_subs; i++) {
+    for (int i = 0; i < size; i++) {
         main_command[start + i] = tmp_files_name[i];
     }
 
@@ -211,7 +241,7 @@ int execute_substitution_process(char **command_args, int nb_subs){
 
 cleanup:
     // Nettoyage des ressources
-    for (int i = 0; i < nb_subs; i++) {
+    for (int i = 0; i < size; i++) {
         unlink(tmp_files_name[i]);
         free(tab[i]);
     }
