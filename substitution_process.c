@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "redirection.h"
 #include "internalCommand.h"
+#include "jobs.h"
 
 /**
  * Retourne le nombre de subs '<(' dans le tableau de commandes
@@ -98,6 +99,8 @@ char **get_main_command(char **command_args){
 }
 
 int execute_substitution_process(char **command_args, int nb_subs){
+    if (isRedirection(command_args) != -1) return 1;
+
     int ret = 0;
 
     char tmp_files_name[nb_subs][256];
