@@ -176,7 +176,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
     tab[nb_substitution] = NULL;
 
     command_args += len(main_command);
-    int size = nb_args(command_args);
+    int size = nb_args(command_args); 
     char reference[size][256];
 
     int pipefd[nb_substitution][2];
@@ -275,6 +275,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
     wait(NULL);
 
 cleanup:
+    for (int i = 0; i < nb_substitution; i++) free(tab[i]);
     free(tab);
     return ret;
 }
