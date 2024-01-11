@@ -27,12 +27,19 @@ int numberOfPipes(char **commande){
 
 bool isPipe(char **commande){
     int i = 0;
+    int numberOfParenthese = 0;
     while(1){
         char *tmp = commande[i];
         if (tmp == NULL){
             break;
         }
-        if(strcmp(tmp,PIPE) == 0){
+        if(strcmp(tmp,"<(")==0){
+            numberOfParenthese++;
+        }
+        if(strcmp(tmp,")")==0){
+            numberOfParenthese--;
+        }
+        if(strcmp(tmp,PIPE) == 0 && numberOfParenthese == 0){
             return true;
         }
         i++;

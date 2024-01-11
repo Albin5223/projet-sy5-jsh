@@ -111,11 +111,18 @@ int print_job_with_pid(int pid, bool printChild, int std){
  * @return An array of commands
 */
 Command *split_commands_for_jobs(char **commande_args,const char *delim) {
+    int numberOfParenthese = 0;
     // Count the number of delimit symbols
     int command_count = 0;  // Start from 1 to account for the first command
     bool last_was_ampersand = false;        // ampersand = &
     for (int i = 0; commande_args[i] != NULL; i++) {
-        if (strcmp(commande_args[i], delim) == 0) {
+        if (strcmp(commande_args[i], "<(") == 0) {
+            numberOfParenthese++;
+        }
+        if (strcmp(commande_args[i], ")") == 0) {
+            numberOfParenthese--;
+        }
+        if (strcmp(commande_args[i], delim) == 0 && numberOfParenthese == 0) {
             command_count++;
             last_was_ampersand = true;
         } else {
@@ -135,13 +142,20 @@ Command *split_commands_for_jobs(char **commande_args,const char *delim) {
     int k = 0;
     commands[0].cmd = malloc(sizeof(char*) * MAX_SUBCOMMANDS);
     commands[0].is_background = false;
+    numberOfParenthese = 0;
     while (1) {
         char *tmp = commande_args[i];
         if (tmp == NULL) {
             commands[j].cmd[k] = NULL;
             break;
         }
-        if (strcmp(tmp, delim) == 0) {
+        if (strcmp(tmp, "<(") == 0) {
+            numberOfParenthese++;
+        }
+        if (strcmp(tmp, ")") == 0) {
+            numberOfParenthese--;
+        }
+        if (strcmp(tmp, delim) == 0 && numberOfParenthese == 0) {
             commands[j].cmd[k] = NULL;
             commands[j].is_background = true;
             j++;
@@ -496,10 +510,15 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
     int numberCommand = nbPipe + 1;
     int tabPid[numberCommand];
     int status;
-
     int pid = fork();
     if(pid == 0){
-        setpgid(0,0);
+        if(!is_background){
+            //tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+        }
+        else{
+            setpgid(0,0);   // Set the process group ID to the process ID, so that the process is not a child of the shell
+        }
+        
         for(int i = 0;i<nbPipe;i++){
             if(pipe(fd[i]) == -1){
                 dprintf(STDERR_FILENO,"Error: pipe failed.\n");
@@ -508,9 +527,23 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
         }
         
         for(int i = 0; i<numberCommand;i++){
+
             tabPid[i] = fork();
             if(tabPid[i] == 0){
+                
                 if(i == 0){
+
+                    dup2(fd[0][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
+                    
+                    for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
+                        close(fd[j][0]);
+                        close(fd[j][1]);
+                    }
+
+                    if(nb_subs(commands[i].cmd) > 0){
+                        status = execute_substitution_process(commands[i].cmd, nb_subs(commands[i].cmd));
+                        exit(status);
+                    }
 
                     if(isRedirectionEntree(commands[i].cmd)!= -1){
                         int descripteur_entree = getFichierEntree(commands[i].cmd);
@@ -534,12 +567,7 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
 
                     
                     
-                    dup2(fd[0][1],STDOUT_FILENO); //On redirige la sortie standard vers le pipe
                     
-                    for(int j = 0;j<nbPipe;j++){ //On ferme tous les descripteurs de fichiers des pipes
-                        close(fd[j][0]);
-                        close(fd[j][1]);
-                    }
                     
                     if(isInternalCommand(commands[i].cmd)){
                         status = executeInternalCommand(commands[i].cmd);
@@ -647,14 +675,12 @@ int execute_commande(char **commande_args) {
     int status;
     for (int i = 0; commands[i].cmd[0] != NULL; i++) {  // Execute each subcommand
 
-        int is_pipe = isPipe(commands[i].cmd);
-        int nb_substitution = nb_subs(commands[i].cmd);
-
-        if (nb_substitution > 0 || !is_pipe) {
-            status = add_job_command(commands[i].cmd, commands[i].is_background);
-        }
-        else{   // Else, execute it with pipe
+        bool is_pipe = isPipe(commands[i].cmd);
+        if(is_pipe){
             status = add_job_command_with_pipe(commands[i].cmd, commands[i].is_background);
+        }
+        else{
+            status = add_job_command(commands[i].cmd, commands[i].is_background);
         }
 
         if (status != 0) {  // If the command failed, free the memory and return the status

@@ -20,5 +20,6 @@ void verify_done_jobs();
 int execute_commande(char **commande_args);
 int fg_id(int id);
 int add_job_command_with_pipe(char **commande_args, bool isBackground);
+int add_job_command(char **commande_args, bool is_background);
 
 #endif
