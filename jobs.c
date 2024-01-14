@@ -45,6 +45,8 @@ const char *status_to_string(enum status status){
             return "Done";
         case STOPPED:
             return "Stopped";
+        case ALREADY_STOPPED:
+            return "Stopped";
         case KILLED:
             return "Killed";
         case DETACHED:
@@ -295,8 +297,9 @@ enum status update_status(int pid) {
     int result = waitpid(pid, &status, WNOHANG | WUNTRACED | WCONTINUED);
     if (result == 0) {
         // Child is still running
-        if(jobs[get_position_with_pid(pid)].status == STOPPED){ // If the job was stopped, return stopped and do not update the status
-            return STOPPED; 
+        if(jobs[get_position_with_pid(pid)].status == STOPPED || jobs[get_position_with_pid(pid)].status == ALREADY_STOPPED){ // If the job was stopped, return ALREADY_STOPPED
+            jobs[get_position_with_pid(pid)].status = ALREADY_STOPPED;
+            return ALREADY_STOPPED; 
         }
         else{   // Else, return running and update the status
             jobs[get_position_with_pid(pid)].status = RUNNING;
@@ -777,11 +780,14 @@ void verify_done_jobs() {
             dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",jobs[i].id);
             return;
         }
-        if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
+        else if(jobs[i].status == DONE || jobs[i].status == KILLED){  // If the job has exited, or killed, print it and remove it from the list
             print_job(jobs[i], STDERR_FILENO);
             remove_job(jobs[i].pid);    // Do not increment i, since the next job will have the same index
         }
-        else{   // If the job is still running, increment i
+        else{   // If the job is still here, increment i
+            if(jobs[i].status == STOPPED){
+                print_job(jobs[i], STDERR_FILENO);
+            }
             i++;
         }
     }

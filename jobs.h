@@ -7,7 +7,7 @@
 #define MAX_SUBCOMMANDS 100
 #define MAX_CHILD 100
 
-enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED};
+enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED, ALREADY_STOPPED};
 
 int get_pid_by_id(int id);
 int *getAllId();
