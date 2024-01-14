@@ -216,64 +216,6 @@ int get_position_with_pid(int pid){
     return -1;
 }
 
-
-int fg_id(int id){
-    int pid = get_pid_by_id(id);
-    if(pid == -1){
-        dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",id);
-        return 1;
-    }
-
-    redirect_signals_to(pid); // Redirect the signals to the child process
-
-    int status;
-    waitpid(pid, &status, 0);
-
-    redirect_signals_to(getpid()); // Redirect the signals to the shell
-
-    // Child is done
-    if (WIFEXITED(status)) {
-        jobs[get_position_with_pid(pid)].status = DONE;
-        jobs[get_position_with_pid(pid)].exit_code = WEXITSTATUS(status); // Store the exit statusZ
-    }
-    else if (WIFSIGNALED(status)) {
-        jobs[get_position_with_pid(pid)].status = KILLED;
-        jobs[get_position_with_pid(pid)].exit_code = WTERMSIG(status); // Store the termination signal  
-    }
-    else if (WIFSTOPPED(status)) {
-        jobs[get_position_with_pid(pid)].status = STOPPED;
-        jobs[get_position_with_pid(pid)].exit_code = WSTOPSIG(status); // Store the termination signal
-        
-    }
-    else if (WIFCONTINUED(status)) {
-        jobs[get_position_with_pid(pid)].status = RUNNING;
-        print_job_with_pid(pid,false,2);
-        
-    }
-    else {
-        jobs[get_position_with_pid(pid)].status = RUNNING; 
-    }
-
-    if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
-        print_job_with_pid(pid, false,STDERR_FILENO);
-        int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
-        remove_job(pid);
-        return exit_code;
-    }
-    else if(jobs[get_position_with_pid(pid)].status == STOPPED){
-        print_job_with_pid(pid, false,STDERR_FILENO);
-        return 0;
-    }
-    else{
-        dprintf(STDERR_FILENO,"Error: unknown status.\n");
-        return 1;
-    }
-
-    return status;
-}
-
-
-
 /**
  * @brief Get the id of the job with the given pid
  * @param pid The pid of the job
@@ -338,6 +280,40 @@ enum status update_status(int pid) {
         }
     }
 }
+
+int fg_id(int id){
+    int pid = get_pid_by_id(id);
+    if(pid == -1){
+        dprintf(STDERR_FILENO,"Error: job [%d] not found.\n",id);
+        return 1;
+    }
+
+    send_signal_to_id(id,SIGCONT);  // Send the SIGCONT signal to the job
+    waitpid(pid, NULL, WCONTINUED);  // Wait for the job to finish
+
+    redirect_signals_to(pid); // Redirect the signals to the child process
+
+    while (1){
+        update_status(pid);
+        if(jobs[get_position_with_pid(pid)].status == DONE || jobs[get_position_with_pid(pid)].status == KILLED){
+            int exit_code = jobs[get_position_with_pid(pid)].exit_code; // Get the exit code of the job
+            remove_job(pid);
+            tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+            redirect_signals_to(getpid()); // Redirect the signals to the shell
+            return exit_code;
+        }
+        else if(jobs[get_position_with_pid(pid)].status == STOPPED){
+            print_job_with_pid(pid, false,STDERR_FILENO);
+            tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
+            redirect_signals_to(getpid()); // Redirect the signals to the shell
+            return 0;
+        }
+        else if(jobs[get_position_with_pid(pid)].status == RUNNING){
+            continue;
+        }
+    }
+}
+
 
 /**
  * @brief Set the first free id in the list of jobs
@@ -655,9 +631,15 @@ int add_job_command_with_pipe(char **commande_args, bool is_background){
     int nbPipe = numberOfPipes(commande_args);
     
     Command *commands = split_commands_for_jobs(commande_args,"|");
+
+    setpgid(0, 0); // Set the process group ID to the process ID
+
     int pid = fork();
     if(pid == 0){
         
+        setsid();
+        setpgid(0, 0); // Create a new process group for the child
+
         execute_pipe(commands,nbPipe,is_background);
         
     }
