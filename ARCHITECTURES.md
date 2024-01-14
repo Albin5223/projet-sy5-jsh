@@ -53,11 +53,6 @@ A l'aide de la fonction `execvp` on exécute la commande externe.
 
 Précisons que `cmd` peut être une commande interne ou externe.
 
-### Commande avec une substituition de processus
-
-Todo : expliquer la substituition de processus
-
-
 ## Exécution d'une commande pipe 
 
 Pour excuter une commmande pipe, on compte le nombre de `|` dans la commande en faisant attention a ce qu'elle ne se situe pas dans une substitution de processus.
@@ -189,4 +184,5 @@ par exemple : `cmd0 /dev/fd/%d fichier`
 - `pipe.c` : Contient les implémentations des fonctions pour gérer les commandes avec des pipes
 - `redirections.c` : Contient les implémentations des fonctions pour gérer les commandes avec des redirections
 - `substitution_process.c` : Contient les implémentations des fonctions pour gérer les commandes avec des substitutions de processus
+- `color.c` : Contient les implémentations permettant de gérer les couleurs dans le terminal
 
