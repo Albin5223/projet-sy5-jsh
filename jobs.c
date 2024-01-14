@@ -442,8 +442,7 @@ int add_job_command(char **commande_args, bool is_background) {
 
         }
         
-        int descripteur_sortie_standart = -1;
-        int descripteur_sortie_erreur = -1;
+        
         int descripteur_entree = -1;
         
         
@@ -468,12 +467,7 @@ int add_job_command(char **commande_args, bool is_background) {
 
         if(isRedirection(commande_args) != -1){
             int *fd = getDescriptorOfRedirection(commande_args);
-            if(fd[0] != -1){
-                descripteur_sortie_standart = fd[0];
-            }
-            if(fd[1] != -1){
-                descripteur_sortie_erreur = fd[1];
-            }
+            
 
             if(isRedirectionStandart(commande_args) != -1 && fd[0] == -1){
                 free(fd);
