@@ -99,7 +99,7 @@ typedef struct {
     char cmd[MAX_SUB_CMD_LEN];
     int id;
     enum status status;
-    int exit_code; //Ca correcpond à la valeur de retour de la commande 
+    int exit_code; // Ca correspond à la valeur de retour de la commande 
 } Job;
 ```
 
@@ -141,7 +141,7 @@ Dans un premier temps, le **shell** ignore les signaux :
 - `SIGTSTP` 
 - `SIGALRM`
 
-Dès que le shell va crée un fils pour excécuter la commande, il va changer son comportement lorsqu'il reçoit un signal : 
+Dès que le shell va créer un fils pour excécuter la commande, il va changer son comportement lorsqu'il reçoit un signal : 
 - Il va le transmettre a son fils si il n'est **pas** en `background` puis lorsque le fils a fini, il rétablit son comportement initial.
 
 
