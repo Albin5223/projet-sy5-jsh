@@ -154,6 +154,30 @@ On va ensuite parser la ligne de commande et l'exécuter.
 Le shell va se répéter tant que l'utilisateur n'a pas entré la commande `exit` *(grâce a une boucle `while(1)`)*.
 
 
+## Substitution de processus
+
+<!-- Pour gérer la substitution de processus, on commence par récupérer la commande 'principale'. 
+
+Exemple : `cmd0 <( cmd1 | cmd2 )` -> on va récupérer `cmd0`
+
+Puis on va récupérer la commande qui se trouve à l'intérieur des parenthèses, donc `cmd1 | cmd2`. -->
+
+Pour gére la substitution de processus, on procède de manière très méthodique : `cmd0 <( cmd1 | cmd2 ) fichier`
+
+1) On récupère la commande principale, c'est à dire la commande qui se trouve avant la substitution de processus. Ici `cmd0`.
+
+2) On récupère la chaines de caractères qui suit, il y a deux cas : 
+    - Soit on a une commande à exécuter `<( cmd1 | cmd2 )`, donc on va la parser afin de récuperer la commande intérieur `cmd1 | cmd2`. Une fois la commande récupérée on va l'éxécuter puis la stocker dans un fichier temporaire avec : `dup2(pipefd[j][1], STDOUT_FILENO);`. 
+    Puis on va mettre la rérérence du fichier temporaire dans la variable `reference[i]` qui aura sera de la forme : `/dev/fd/%d`. Cette référence qui nous servira plus tard pour l'étape 4.
+
+    - Soit on a affaire à un fichier `fichier`, et donc on va simplement vérifier s'il existe (avec la méthode `open`) et on va stocker son chemin dans la variable `reference[i]` qui nous servira pour l'étape 4.
+
+3) On réitère l'étape 2 jusqu'à ce qu'on ait récupéré toutes les commandes et fichiers.
+
+4) On exécute la commande principale en lui passant en paramètre les références des fichiers temporaires ou des fichiers qu'on a récupéré à l'étape 2.
+par exemple : `cmd0 /dev/fd/%d fichier`
+
+
 ## Description des fichiers
 
 - `jsh.c` : Contient le main du shell
