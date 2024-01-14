@@ -389,7 +389,6 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
             }
             else if(jobs[get_position_with_pid(child_pid)].status == STOPPED){
                 print_job_with_pid(child_pid, false,STDERR_FILENO);
-                
                 tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
                 redirect_signals_to(getpid()); // Redirect the signals to the shell
                 return 0;
@@ -399,7 +398,6 @@ int executeFatherWork(pid_t child_pid, char **commande_args, bool is_background)
             }
             else{
                 dprintf(STDERR_FILENO,"Error: unknown status.\n");
-                
                 tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
                 redirect_signals_to(getpid()); // Redirect the signals to the shell
                 return 1;
@@ -431,17 +429,12 @@ int add_job_command(char **commande_args, bool is_background) {
             exit(value);
         }
 
+        setsid();
+        setpgid(0, 0); // Create a new process group for the child
+
         if(!is_background){
             tcsetpgrp(STDIN_FILENO,getpgrp()); // Get the terminal's foreground process group
-            
         }
-        else{
-            //Le fils va récréer son groupe plus bas
-
-            setpgid(0,0);   // Set the process group ID to the process ID, so that the process is not a child of the shell
-
-        }
-        
         
         int descripteur_entree = -1;
         

@@ -275,7 +275,7 @@ void dont_ignore_all_signals() {
     }
 }
 
-pid_t other_pid;
+volatile pid_t other_pid;
 
 void signal_handler(int sig) {
     kill(other_pid, sig);
