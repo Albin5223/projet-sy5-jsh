@@ -24,5 +24,6 @@ void ignore_all_signals();
 void dont_ignore_all_signals();
 void redirect_signals_to(pid_t pid);
 
+void prettyPrint(char **commands,int fd);
 
 #endif

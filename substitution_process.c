@@ -166,11 +166,12 @@ int nb_args(char **command_args){
 */
 
 int execute_substitution_process(char **command_args, int nb_substitution) {
-    if (isRedirection(command_args) != -1) return 1;
+    if (isRedirection(command_args) != -1) exit(1);
 
     int ret = 0;
     char **main_command = get_main_command(command_args);
 
+    
     char ***tab = malloc(sizeof(char**) * (nb_substitution + 1));
     if (tab == NULL) exit(1);
     tab[nb_substitution] = NULL;
@@ -206,7 +207,9 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
         }
   
         if (pid == 0) {
+            
             dup2(pipefd[j][1], STDOUT_FILENO);
+            
 
             if (isInternalCommand(tab[j]) == 1){
                 ret = executeInternalCommand(tab[j]);
@@ -214,8 +217,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
             }
 
             if (isPipe(tab[j]) == 1){
-                ret = add_job_command_with_pipe(tab[j], false);
-                exit(ret);
+                execute_pipe_lancher(tab[j],false);
             }
 
             if (nb_subs(tab[j]) > 0){
@@ -239,11 +241,15 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
             
             command_args += len(tab[j]) + 2;    // afin de sauter : <( et )
         }
+
+        free(tab[j]);
     }
 
     for (int i = 0; i < nb_substitution; i++){
         wait(NULL);
     }
+
+    
 
     int start = len(main_command);
     main_command = realloc(main_command, sizeof(char*) * (start + size + 1));
@@ -257,6 +263,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
     for (int i = 0; i < size; i++) {
         main_command[start + i] = reference[i];
     }
+    //Excecuter la main commande
 
     if (fork() == 0) {
         if (isInternalCommand(main_command) == 1){
@@ -271,11 +278,11 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
     for (int i = 0; i < nb_substitution; i++){
         close(pipefd[i][0]);
     }
-
+    free(main_command);
     wait(NULL);
 
 cleanup:
-    for (int i = 0; i < nb_substitution; i++) free(tab[i]);
+
     free(tab);
     return ret;
 }

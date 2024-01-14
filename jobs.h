@@ -7,7 +7,7 @@
 #define MAX_SUBCOMMANDS 100
 #define MAX_CHILD 100
 
-enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED};
+enum status {RUNNING, DONE, STOPPED, KILLED, DETACHED, ALREADY_STOPPED};
 
 int get_pid_by_id(int id);
 int *getAllId();
@@ -19,6 +19,7 @@ int print_job_with_pid(int pid ,bool printChild,int std);
 void verify_done_jobs();
 int execute_commande(char **commande_args);
 int fg_id(int id);
-int add_job_command_with_pipe(char **commande_args, bool isBackground);
+int add_job_command(char **commande_args, bool is_background);
+int execute_pipe_lancher(char **commande_args, bool is_background);
 
 #endif
