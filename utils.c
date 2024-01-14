@@ -285,10 +285,26 @@ void redirect_signals_to(pid_t pid){
     other_pid = pid;
     struct sigaction sa = {0};
     sa.sa_handler = signal_handler;
-    // Ignore all signals except SIGKILL and SIGSTOP and SIGCHLD
+    // Redirect all signals except SIGKILL and SIGSTOP and SIGCHLD
     for (int i = 1; i < NSIG; i++) {
         if (i != SIGKILL && i != SIGSTOP && i != SIGCHLD) {
             sigaction(i, &sa, NULL);
         }
+    } 
+}
+
+
+
+void prettyPrint(char **commands,int fd){
+    int i = 0;
+    while(1){
+        char *tmp = commands[i];
+        if(tmp == NULL) {
+            dprintf(fd,"NULL \n");
+            break;
+        }
+        dprintf(fd,"%s ", tmp);
+        i++;
     }
+    printf("\n");
 }
