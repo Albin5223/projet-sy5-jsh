@@ -154,6 +154,15 @@ On va ensuite parser la ligne de commande et l'exécuter.
 Le shell va se répéter tant que l'utilisateur n'a pas entré la commande `exit` *(grâce a une boucle `while(1)`)*.
 
 
+## Description des fichiers
 
-
+- `jsh.c` : Contient le main du shell
+- `utils.c` : Contient les fonctions utilitaires
+- `internalCommand.c` : Contient les implémentations des commandes internes
+- `jobs-command.c` : Contient les implémentations de la commande `jobs` et avec l'options `-t`
+- `jobs.c` : Contient les implémentations des fonctions pour gérer les jobs et executer les commandes 
+- `kill.c` : Contient les implémentations des fonctions pour gérer les signaux (envoie de signaux)
+- `pipe.c` : Contient les implémentations des fonctions pour gérer les commandes avec des pipes
+- `redirections.c` : Contient les implémentations des fonctions pour gérer les commandes avec des redirections
+- `substitution_process.c` : Contient les implémentations des fonctions pour gérer les commandes avec des substitutions de processus
 
