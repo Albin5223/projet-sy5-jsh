@@ -266,7 +266,7 @@ int execute_substitution_process(char **command_args, int nb_substitution) {
             execvp(main_command[0], main_command);
             exit(EXIT_FAILURE);
         }
-    }
+    } 
 
     for (int i = 0; i < nb_substitution; i++){
         close(pipefd[i][0]);
